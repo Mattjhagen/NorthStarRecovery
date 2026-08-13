@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Northstar Recovery",
+    "slug": "northstar-recovery",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "northstar-recovery",
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#5DE0A6"
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.northstar.recovery"
+    },
+    "android": {
+      "package": "com.northstar.recovery",
+      "adaptiveIcon": {
+        "backgroundColor": "#101827"
+      }
+    }
+  }
+}
