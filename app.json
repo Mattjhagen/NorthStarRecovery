@@ -13,16 +13,34 @@
           "color": "#5DE0A6"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Northstar Recovery uses your microphone when you join a meeting with audio or video.",
+          "recordAudioAndroid": true
+        }
+      ],
+      "expo-font",
+      "expo-asset"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.northstar.recovery"
+      "bundleIdentifier": "com.northstar.recovery",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
       "package": "com.northstar.recovery",
       "adaptiveIcon": {
         "backgroundColor": "#101827"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "d72ac8a6-9bd3-41c3-b4e4-55c04cc330f7"
       }
     }
   }
