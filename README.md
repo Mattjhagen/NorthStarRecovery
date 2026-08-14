@@ -1,5 +1,29 @@
 # Northstar Recovery
 
+## Public homepage
+
+The repository homepage is the CMA Meet landing site. Start it at `http://localhost:3000` with:
+
+```bash
+npm start
+```
+
+Build the deployable static site with:
+
+```bash
+npm run site:build
+```
+
+The privacy policy is available at `/privacy` (production URL: `https://cmameet.site/privacy` once the static site is deployed).
+
+## Mobile app
+
+The Expo app remains in the repository root. Start Metro with:
+
+```bash
+npm run mobile
+```
+
 An Expo managed-workflow prototype for iOS and Android. It is a private-feeling recovery companion with meeting discovery, a learning path, connection tools, and notification preference demos.
 
 ## Run
