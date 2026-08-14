@@ -1,0 +1,17 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Four overlapping circles with heart icon in center -->
+  <!-- Top-left circle - medium blue -->
+  <circle cx="180" cy="180" r="120" fill="#4A90E2" opacity="0.9"/>
+  
+  <!-- Top-right circle - purple -->
+  <circle cx="332" cy="180" r="120" fill="#8B5CF6" opacity="0.9"/>
+  
+  <!-- Bottom-left circle - dark blue -->
+  <circle cx="180" cy="332" r="120" fill="#1E3A8A" opacity="0.9"/>
+  
+  <!-- Bottom-right circle - light gray -->
+  <circle cx="332" cy="332" r="120" fill="#9CA3AF" opacity="0.9"/>
+  
+  <!-- Heart icon in the center -->
+  <path d="M256 200 C256 200, 220 170, 220 200 C220 230, 256 260, 256 260 C256 260, 292 230, 292 200 C292 170, 256 200, 256 200 Z" fill="white" stroke="white" stroke-width="2"/>
+</svg>
