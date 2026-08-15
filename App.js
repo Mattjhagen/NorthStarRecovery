@@ -1,12 +1,11 @@
 ﻿import 'react-native-get-random-values';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Easing, Image, Linking, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, View, ActivityIndicator } from 'react-native';
+import { Alert, Animated, Easing, Image, Linking, Modal, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { ErrorCode, useIAP } from 'expo-iap';
 import * as ImagePicker from 'expo-image-picker';
-import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleMeetingReminder, cancelMeetingReminders } from './notifications';
+import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, cancelMeetingReminders, sendLocalNotification } from './notifications';
 import { READINGS } from './readings';
 import { createAccount, confirmAccount, signInWithPassword, restoreSignedInUser, signOutEverywhere } from './auth';
 import { apiRequest, isBackendConfigured } from './backend';
@@ -153,11 +152,34 @@ function nextMeeting(meetings) {
     .sort((a, b) => a.minsAway - b.minsAway)[0] || null;
 }
 
-const supportProducts = [
-  { id:'com.northstar.recovery.support.small', fallbackPrice:'$1.99' },
-  { id:'com.northstar.recovery.support.medium', fallbackPrice:'$4.99' },
-  { id:'com.northstar.recovery.support.large', fallbackPrice:'$9.99' },
-];
+async function fetchRecoveryNews() {
+  try {
+    const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://nida.nih.gov/news-events/rss.xml')}&count=6`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'ok' && data.items?.length) {
+        return data.items.map(item => ({
+          id: item.guid || item.link,
+          title: item.title,
+          summary: (item.description || item.content || '')
+            .replace(/<[^>]+>/g, '').replace(/&[a-z#\d]+;/gi, ' ').trim().slice(0, 200),
+          pubDate: item.pubDate,
+          link: item.link,
+          source: 'NIDA',
+        }));
+      }
+    }
+  } catch {}
+  return [];
+}
+
+const STRIPE_LINKS = {
+  small:  'https://buy.stripe.com/test_small',
+  medium: 'https://buy.stripe.com/test_medium',
+  large:  'https://buy.stripe.com/test_large',
+};
+const VENMO_USER = 'NorthstarRecovery';
 
 const GENDER_TO_API = { 'Woman':'woman','Man':'man','Nonbinary':'nonbinary','Prefer not to say':'prefer-not-to-say' };
 const API_TO_GENDER = Object.fromEntries(Object.entries(GENDER_TO_API).map(([k,v])=>[v,k]));
@@ -199,11 +221,12 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [editingProfile, setEditingProfile] = useState(false);
   const [readingsOpen, setReadingsOpen] = useState(false);
-  const [profile, setProfile] = useState({ pseudonym:'', bio:'', photo:'', dob:'', gender:'', groupPreference:'All groups', sobrietyDate:'' });
+  const [profile, setProfile] = useState({ pseudonym:'', bio:'', photo:'', dob:'', gender:'', groupPreference:'All groups', sobrietyDate:'', sponsor:{ name:'', phone:'' }, trustedPerson:{ name:'', phone:'', enabled:false }, privacyMode:false });
   const [journalEntries, setJournalEntries] = useState([]);
   const [currentSoundscape, setCurrentSoundscape] = useState(SOUNDSCAPES[0]);
   const [cmaLoaded, setCmaLoaded] = useState(false);
   const [meetings, setMeetings] = useState(FALLBACK_MEETINGS);
+  const [recoveryNews, setRecoveryNews] = useState([]);
 
   const calmPlayer = useAudioPlayer(soundscapeUri(currentSoundscape.name));
 
@@ -240,6 +263,8 @@ export default function App() {
     if (cmaLoaded) return;
     fetchCMAMeetings().then(m => { setMeetings(m); setCmaLoaded(true); });
   }, [cmaLoaded]);
+
+  useEffect(() => { fetchRecoveryNews().then(setRecoveryNews); }, []);
 
   const say = msg => { setToast(msg); setTimeout(()=>setToast(''), 2600); };
   const support = () => Alert.alert('Need support now?','This opens your phone app to contact urgent support. Northstar is not emergency care.',[{text:'Not now',style:'cancel'},{text:'Open phone',onPress:()=>Linking.openURL('tel:988')}]);
@@ -292,12 +317,12 @@ export default function App() {
       <View style={styles.body}>
         {tab==='Today'    && <Today say={say} go={setTab} profile={profile} sobrietyDays={sobrietyDays} meetings={meetings}/>}
         {tab==='Meetings' && <Meetings say={say} profile={profile} meetings={meetings} loading={!cmaLoaded}/>}
-        {tab==='Learn'    && <Learn say={say} onReadings={()=>setReadingsOpen(true)}/>}
+        {tab==='Learn'    && <Learn say={say} onReadings={()=>setReadingsOpen(true)} news={recoveryNews}/>}
         <View style={[styles.calmTab, tab!=='Calm'&&styles.hidden]}>
           <Calm player={calmPlayer} soundscape={currentSoundscape} soundscapes={SOUNDSCAPES} onSelectSoundscape={setCurrentSoundscape}/>
         </View>
         {tab==='Connect'  && <Connect say={say}/>}
-        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries}/>}
+        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile}/>}
         {tab==='Journal'  && <Journal say={say} entries={journalEntries} onAdd={addJournalEntry}/>}
       </View>
       <View style={styles.tabbar}>
@@ -405,8 +430,20 @@ function ProfileEditor({ profile, onSave, onCancel }) {
         <View style={styles.choiceWrap}>{['Woman','Man','Nonbinary','Prefer not to say'].map(x=><Choice key={x} label={x} active={draft.gender===x} onPress={()=>setDraft(p=>({...p,gender:x}))}/>)}</View>
         <Text style={styles.fieldLabel}>GROUP PREFERENCE</Text>
         <View style={styles.choiceWrap}>{['Women-only','Men-only','All groups'].map(x=><Choice key={x} label={x} active={draft.groupPreference===x} onPress={()=>setDraft(p=>({...p,groupPreference:x}))}/>)}</View>
-        <Field label="SOBRIETY DATE (OPTIONAL)" value={draft.sobrietyDate} onChange={v=>setDraft(p=>({...p,sobrietyDate:v}))} placeholder="MM/DD/YYYY"/>
-        <Button label="Save profile" onPress={()=>onSave(draft)} icon="checkmark"/>
+        <Field label=”SOBRIETY DATE (OPTIONAL)” value={draft.sobrietyDate} onChange={v=>setDraft(p=>({...p,sobrietyDate:v}))} placeholder=”MM/DD/YYYY”/>
+        <Text style={[styles.onboardKicker,{marginTop:8}]}>SPONSOR (OPTIONAL)</Text>
+        <Text style={[styles.muted,{marginBottom:4}]}>Save your sponsor's info for one-tap support.</Text>
+        <Field label=”SPONSOR NAME” value={draft.sponsor?.name||''} onChange={v=>setDraft(p=>({...p,sponsor:{...p.sponsor,name:v}}))} placeholder=”Their name” autoCapitalize=”words”/>
+        <Field label=”SPONSOR PHONE” value={draft.sponsor?.phone||''} onChange={v=>setDraft(p=>({...p,sponsor:{...p.sponsor,phone:v}}))} placeholder=”+1 (555) 000-0000”/>
+        <Text style={[styles.onboardKicker,{marginTop:8}]}>TRUSTED PERSON (OPTIONAL)</Text>
+        <Text style={[styles.muted,{marginBottom:4}]}>Someone who can check on you if they're concerned.</Text>
+        <Field label=”TRUSTED PERSON NAME” value={draft.trustedPerson?.name||''} onChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,name:v}}))} placeholder=”Their name” autoCapitalize=”words”/>
+        <Field label=”TRUSTED PERSON PHONE” value={draft.trustedPerson?.phone||''} onChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,phone:v}}))} placeholder=”+1 (555) 000-0000”/>
+        <View style={[styles.setting,{borderBottomWidth:0,marginTop:4}]}>
+          <View style={{flex:1}}><Text style={styles.cardTitle}>Allow trusted person access</Text><Text style={styles.muted}>They can see your check-in status.</Text></View>
+          <Switch value={!!draft.trustedPerson?.enabled} onValueChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,enabled:v}}))} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={draft.trustedPerson?.enabled?C.mint:C.muted}/>
+        </View>
+        <Button label=”Save profile” onPress={()=>onSave(draft)} icon=”checkmark”/>
         <Pressable onPress={onCancel} style={styles.skip}><Text style={styles.textButtonLabel}>Cancel</Text></Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -499,6 +536,22 @@ function Today({ say, go, profile, sobrietyDays, meetings }) {
   const next = nextMeeting(meetings);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const [showDays, setShowDays] = useState(false);
+  const hasSponsor = profile.sponsor?.name && profile.sponsor?.phone;
+  const helpNow = () => {
+    if (hasSponsor) {
+      Alert.alert(`Reach out to ${profile.sponsor.name}?`, 'Opening your phone now.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Call', onPress: () => Linking.openURL(`tel:${profile.sponsor.phone}`) },
+        { text: 'Text', onPress: () => Linking.openURL(`sms:${profile.sponsor.phone}`) },
+      ]);
+    } else {
+      Alert.alert('Need support now?', 'Call or text 988 for immediate, confidential support.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Call 988', onPress: () => Linking.openURL('tel:988') },
+      ]);
+    }
+  };
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <Text style={styles.eyebrow}>A GENTLE START</Text>
@@ -506,13 +559,36 @@ function Today({ say, go, profile, sobrietyDays, meetings }) {
       <Text style={styles.intro}>You don't have to do the whole journey today. Just this moment.</Text>
       {sobrietyDays !== null && (
         <Card style={styles.streak}>
-          <View>
+          <View style={{flex:1}}>
             <Text style={styles.mini}>YOUR CLEAR DAY STREAK</Text>
-            <Text style={styles.streakNum}>{sobrietyDays} <Text style={styles.streakUnit}>days</Text></Text>
-            <Text style={styles.muted}>{sobrietyDays === 0 ? 'Today is day one. You showed up.' : sobrietyDays === 1 ? 'One day. That\'s everything.' : 'A quiet streak, a real win.'}</Text>
+            <View style={{flexDirection:'row',alignItems:'center',gap:10,marginTop:2}}>
+              <Text style={styles.streakNum}>{showDays ? sobrietyDays : '• • •'} <Text style={styles.streakUnit}>days</Text></Text>
+              <Pressable onPress={()=>setShowDays(v=>!v)} style={styles.revealBtn} hitSlop={8}>
+                <Icon name={showDays?'eye-off-outline':'eye-outline'} size={15} color={C.muted}/>
+                <Text style={styles.revealText}>{showDays?'Hide':'Reveal'}</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.muted}>{!showDays ? 'Tap reveal to see your count.' : sobrietyDays === 0 ? 'Today is day one. You showed up.' : sobrietyDays === 1 ? 'One day. That\'s everything.' : 'A quiet streak, a real win.'}</Text>
           </View>
           <View style={styles.sun}><Icon name="sunny" size={30} color={C.gold}/></View>
         </Card>
+      )}
+      {hasSponsor && (
+        <Pressable onPress={helpNow} style={styles.sponsorQuick}>
+          <Icon name="person-circle-outline" size={22} color={C.mint}/>
+          <View style={{flex:1}}>
+            <Text style={styles.sponsorQuickName}>{profile.sponsor.name}</Text>
+            <Text style={styles.sponsorQuickSub}>Your sponsor · tap to reach out</Text>
+          </View>
+          <View style={{flexDirection:'row',gap:8}}>
+            <Pressable onPress={()=>Linking.openURL(`tel:${profile.sponsor.phone}`)} style={styles.contactChip}>
+              <Icon name="call-outline" size={16} color={C.ink}/>
+            </Pressable>
+            <Pressable onPress={()=>Linking.openURL(`sms:${profile.sponsor.phone}`)} style={[styles.contactChip,{backgroundColor:C.blue}]}>
+              <Icon name="chatbubble-outline" size={16} color={C.ink}/>
+            </Pressable>
+          </View>
+        </Pressable>
       )}
       {next ? (
         <Card>
@@ -542,8 +618,8 @@ function Today({ say, go, profile, sobrietyDays, meetings }) {
         <Pressable onPress={()=>go('Learn')} style={styles.inlineAction}><Icon name="sparkles-outline" color={C.gold}/><Text style={styles.inlineText}>Learn by living it</Text></Pressable>
         <Pressable onPress={()=>go('Calm')} style={styles.inlineAction}><Icon name="headset-outline" color={C.blue}/><Text style={styles.inlineText}>Calm soundscapes</Text></Pressable>
       </Card>
-      <Pressable style={styles.support} onPress={()=>Alert.alert('Need support now?','Northstar can open a phone/urgent-support path. It is not emergency care.',[{text:'Call 988',onPress:()=>Linking.openURL('tel:988')},{text:'OK'}])}>
-        <Icon name="heart" size={17} color={C.gold}/><Text style={styles.supportText}>Need support now?</Text><Icon name="call-outline" size={16} color={C.gold}/>
+      <Pressable style={styles.support} onPress={helpNow}>
+        <Icon name="heart" size={17} color={C.gold}/><Text style={styles.supportText}>{hasSponsor ? `Reach out to ${profile.sponsor.name}` : 'Need support now?'}</Text><Icon name={hasSponsor ? 'call-outline' : 'heart-outline'} size={16} color={C.gold}/>
       </Pressable>
     </ScrollView>
   );
@@ -553,12 +629,40 @@ function Today({ say, go, profile, sobrietyDays, meetings }) {
 function Meetings({ say, profile, meetings, loading }) {
   const [filter, setFilter] = useState('All');
   const [query, setQuery] = useState('');
+  const [roomUrl, setRoomUrl] = useState(null);
   const shown = meetings.filter(m=>(filter==='All'||m.format===filter)&&`${m.title} ${m.region} ${m.day}`.toLowerCase().includes(query.toLowerCase()));
   const meetNow = nextMeeting(meetings);
+
+  const openRoom = () => {
+    const id = Math.random().toString(36).slice(2, 10);
+    const url = `https://meet.jit.si/northstar-${id}`;
+    setRoomUrl(url);
+    Alert.alert(
+      'Your meeting room is ready',
+      `Share this link with others to join your room:\nmeet.jit.si/northstar-${id}`,
+      [
+        { text: 'Copy & Open', onPress: () => { Share.share({ message: `Join my Northstar Recovery meeting: ${url}`, title: 'Northstar Recovery Meeting' }); Linking.openURL(url); } },
+        { text: 'Share link', onPress: () => Share.share({ message: `Join my Northstar Recovery meeting: ${url}` }) },
+        { text: 'Just open', onPress: () => Linking.openURL(url) },
+      ]
+    );
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <Text style={styles.h1}>Find your room</Text>
       <Text style={styles.intro}>Choose what feels possible today.</Text>
+      <Card style={{borderColor:C.blue,borderWidth:1}}>
+        <View style={styles.rowBetween}>
+          <View style={{flex:1}}>
+            <Text style={styles.mini}>HOST YOUR OWN MEETING</Text>
+            <Text style={styles.cardTitle}>Start a free video room</Text>
+            <Text style={styles.muted}>Share the link and anyone can join instantly.</Text>
+          </View>
+          <View style={[styles.remote,{backgroundColor:'#1a2040'}]}><Icon name="videocam-outline" color={C.blue}/></View>
+        </View>
+        <Button label="Open a video room" onPress={openRoom} icon="videocam"/>
+      </Card>
       {profile.groupPreference!=='All groups'&&<View style={styles.preferenceNote}><Icon name="options-outline" size={16} color={C.mint}/><Text style={styles.preferenceText}>Your preference: {profile.groupPreference}.</Text></View>}
       {meetNow && (
         <Card style={{borderColor:C.mint,borderWidth:1.5}}>
@@ -599,7 +703,7 @@ function Meetings({ say, profile, meetings, loading }) {
 }
 
 // â”€â”€â”€ LEARN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function Learn({ say, onReadings }) {
+function Learn({ say, onReadings, news }) {
   const [complete, setComplete] = useState(1);
   const [open, setOpen] = useState(1);
   const totalXP = LEARN_MODULES.slice(0,complete).reduce((s,m)=>s+m.xp,0);
@@ -644,6 +748,21 @@ function Learn({ say, onReadings }) {
           </Card>
         );
       })}
+      {news.length > 0 && <>
+        <Text style={[styles.sectionTitle,{marginTop:8}]}>RECOVERY RESEARCH & NEWS</Text>
+        <Text style={[styles.muted,{marginBottom:4}]}>From NIDA — the National Institute on Drug Abuse.</Text>
+        {news.map(item=>(
+          <Pressable key={item.id} onPress={()=>Linking.openURL(item.link)} style={styles.newsCard}>
+            <View style={styles.newsBadge}><Icon name=”newspaper-outline” size={16} color={C.ink}/></View>
+            <View style={{flex:1}}>
+              <Text style={styles.newsTitle} numberOfLines={2}>{item.title}</Text>
+              {item.summary?<Text style={styles.newsSummary} numberOfLines={3}>{item.summary}</Text>:null}
+              <Text style={styles.newsSource}>{item.source} · {item.pubDate?.slice(0,10)}</Text>
+            </View>
+            <Icon name=”open-outline” size={15} color={C.muted}/>
+          </Pressable>
+        ))}
+      </>}
     </ScrollView>
   );
 }
@@ -758,14 +877,8 @@ function BreathingGuide({ isPlaying }) {
 }
 
 // â”€â”€â”€ CONNECT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const boardSeed = [
-  {id:'p1',author:'Maya R.',initial:'M',category:'CHECK-IN',time:'18 minutes ago',body:'Today I called someone before I talked myself out of it. That was enough.',bio:'Finding my footing one honest conversation at a time.',comments:[{id:'c1',author:'Sage',body:"That took courage. I'm glad you reached out."}]},
-  {id:'p2',author:'Jonah L.',initial:'J',category:'QUESTION',time:'42 minutes ago',body:'What helps you make it through the first hour when a hard feeling shows up?',bio:'Here to listen, learn, and offer a little steadiness.',comments:[]},
-  {id:'p3',author:'River',initial:'R',category:'STORY',time:'Yesterday',body:'I went to a meeting even though I wanted to disappear. I left feeling a little less alone.',bio:'Quietly rebuilding a life I want to be present for.',comments:[{id:'c2',author:'Maya R.',body:'Thank you for sharing this. You helped me remember I can go too.'}]},
-];
-
 function Connect({ say }) {
-  const [posts, setPosts] = useState(boardSeed);
+  const [posts, setPosts] = useState([]);
   const [blocked, setBlocked] = useState([]);
   const [compose, setCompose] = useState(false);
   const [postSheet, setPostSheet] = useState(null);
@@ -880,59 +993,186 @@ function Journal({ say, entries, onAdd }) {
   );
 }
 
-// â”€â”€â”€ YOU â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€ SUPPORT CARD (Stripe + Venmo) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function SupportNorthstar({ say }) {
-  const { connected, products, fetchProducts, requestPurchase, finishTransaction } = useIAP({
-    onPurchaseSuccess: async purchase=>{ try { await finishTransaction({purchase,isConsumable:true}); say('Thank you for supporting Northstar.'); } catch { say('Purchase received.'); } },
-    onPurchaseError: error=>{ if(error.code!==ErrorCode.UserCancelled) say('The purchase could not be completed.'); },
-    onError: ()=>say('The App Store is not available right now.'),
-  });
-  useEffect(()=>{ fetchProducts({skus:supportProducts.map(p=>p.id),type:'in-app'}); },[fetchProducts]);
-  const buy=async id=>{ if(!connected){say('Connecting to the App Storeâ€¦');return;} try{await requestPurchase({type:'in-app',request:{apple:{sku:id,quantity:1},google:{skus:[id]}}});}catch{say('Purchase could not be started.');} };
+  const donate = (amount, label) => {
+    Alert.alert(`Support Northstar — ${label}`, 'Choose how you want to give.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Pay with card (Stripe)', onPress: () => {
+        const links = { '$2': STRIPE_LINKS.small, '$5': STRIPE_LINKS.medium, '$10': STRIPE_LINKS.large };
+        const url = links[label] || STRIPE_LINKS.small;
+        Linking.openURL(url).catch(() => say('Stripe checkout will be available soon.'));
+      }},
+      { text: 'Pay with Venmo', onPress: () => {
+        Linking.openURL(`venmo://paycharge?txn=pay&recipients=${VENMO_USER}&amount=${amount}&note=Northstar Recovery Support`)
+          .catch(() => Linking.openURL(`https://venmo.com/${VENMO_USER}`));
+      }},
+    ]);
+  };
   return (
     <Card style={styles.supportCard}>
-      <View style={styles.row}><View style={styles.supportBadge}><Icon name="heart" color={C.ink}/></View><View style={{flex:1}}><Text style={styles.cardTitle}>Support Northstar</Text><Text style={styles.muted}>Optional one-time support for continued development.</Text></View></View>
-      <Text style={styles.supportFinePrint}>Every recovery tool remains available whether or not you support Northstar.</Text>
-      <View style={styles.supportOptions}>{supportProducts.map(option=>{ const product=products.find(item=>item.id===option.id); const price=product?.displayPrice||option.fallbackPrice; return <Pressable key={option.id} onPress={()=>buy(option.id)} style={styles.supportOption}><Text style={styles.supportPrice}>{price}</Text><Text style={styles.supportOptionLabel}>One-time</Text></Pressable>; })}</View>
+      <View style={styles.row}>
+        <View style={styles.supportBadge}><Icon name=”heart” color={C.ink}/></View>
+        <View style={{flex:1}}>
+          <Text style={styles.cardTitle}>Support Northstar</Text>
+          <Text style={styles.muted}>Optional support — every recovery tool stays free.</Text>
+        </View>
+      </View>
+      <View style={styles.supportOptions}>
+        {[['$2',2],['$5',5],['$10',10]].map(([label,amount])=>(
+          <Pressable key={label} onPress={()=>donate(amount,label)} style={styles.supportOption}>
+            <Text style={styles.supportPrice}>{label}</Text>
+            <Text style={styles.supportOptionLabel}>one-time</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.supportFinePrint}>Apple Pay, Venmo, and card accepted.</Text>
     </Card>
   );
 }
 
-function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries }) {
-  const [prefs, setPrefs] = useState({ meetings:true, insight:false });
-  const name = profile.pseudonym||'Northstar member';
-  const toggleInsight = async(val)=>{
+// â”€â”€â”€ YOU â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries, saveProfile }) {
+  const [prefs, setPrefs] = useState({ meetings:true, insight:false, checkin:false, circleNotifs:true });
+  const name = profile.pseudonym || 'Northstar member';
+  const hasSponsor = profile.sponsor?.name;
+  const hasTrusted = profile.trustedPerson?.name && profile.trustedPerson?.enabled;
+
+  const toggleInsight = async val => {
     setPrefs(p=>({...p,insight:val}));
-    if (val) { const r=await scheduleDailyUplift(9,0); if(!r.ok) { say(r.reason); setPrefs(p=>({...p,insight:false})); } else say('Daily insight scheduled for 9 AM.'); }
-    else { await cancelDailyUplift(); say('Daily insight turned off.'); }
+    if (val) { const r=await scheduleDailyUplift(9,0); if(!r.ok){say(r.reason);setPrefs(p=>({...p,insight:false}));}else say('Daily inspiration at 9 AM.'); }
+    else { await cancelDailyUplift(); say('Daily inspiration off.'); }
   };
-  const toggleMeetings = async(val)=>{
+  const toggleCheckin = async val => {
+    setPrefs(p=>({...p,checkin:val}));
+    if (val) { const r=await scheduleDailyCheckin(20,0); if(!r.ok){say(r.reason);setPrefs(p=>({...p,checkin:false}));}else say('Check-in reminder at 8 PM.'); }
+    else { await cancelDailyCheckin(); say('Check-in reminder off.'); }
+  };
+  const toggleMeetings = async val => {
     setPrefs(p=>({...p,meetings:val}));
-    if (!val) { await cancelMeetingReminders(); say('Meeting reminders turned off.'); }
-    else say('Meeting reminders on â€” reminders set when you save a meeting.');
+    if (!val) { await cancelMeetingReminders(); say('Meeting reminders off.'); }
+    else say('Meeting reminders on.');
   };
+  const togglePrivacy = val => {
+    const next = { ...profile, privacyMode: val };
+    saveProfile(next);
+    say(val ? 'Anonymous mode on — your profile is hidden from community search.' : 'Anonymous mode off.');
+  };
+  const inviteFriend = () => Share.share({
+    message: “I'm using Northstar Recovery on my sobriety journey. It's gentle and private — join me.”,
+    title: 'Northstar Recovery',
+  });
+
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <Text style={styles.h1}>Your northstar</Text>
       <Text style={styles.intro}>The small things you are carrying forward.</Text>
+
       <Card style={styles.profile}>
         <Avatar photo={profile.photo} initial={name.charAt(0).toUpperCase()} size={56} radius={18}/>
-        <View style={{flex:1}}><Text style={styles.cardTitle}>{name}</Text><Text style={styles.muted}>{sobrietyDays!==null?`${sobrietyDays} clear days Â· showing up`:'Here in your own time'}</Text></View>
-        <Pressable onPress={editProfile}><Icon name="create-outline" color={C.mint}/></Pressable>
+        <View style={{flex:1}}>
+          <Text style={styles.cardTitle}>{name}</Text>
+          <Text style={styles.muted}>{sobrietyDays !== null ? 'In recovery · showing up' : 'Here in your own time'}</Text>
+        </View>
+        <Pressable onPress={editProfile}><Icon name=”create-outline” color={C.mint}/></Pressable>
       </Card>
-      <Pressable onPress={editProfile} style={styles.privacyAction}><Icon name="shield-checkmark-outline" color={C.mint}/><View style={{flex:1}}><Text style={styles.cardTitle}>Profile & privacy</Text><Text style={styles.muted}>Review what you choose to share.</Text></View><Icon name="chevron-forward" color={C.muted}/></Pressable>
-      {sobrietyDays!==null&&<View style={styles.achievement}><Icon name="flame" size={28} color={C.gold}/><View><Text style={styles.cardTitle}>Your rhythm</Text><Text style={styles.muted}>{sobrietyDays} clear days, one day at a time.</Text></View></View>}
-      <Pressable onPress={goJournal} style={styles.privacyAction}><Icon name="book-outline" color={C.gold}/><View style={{flex:1}}><Text style={styles.cardTitle}>Your journal</Text><Text style={styles.muted}>{entries.length} {entries.length===1?'entry':'entries'} Â· private</Text></View><Icon name="chevron-forward" color={C.muted}/></Pressable>
+      <Pressable onPress={editProfile} style={styles.privacyAction}>
+        <Icon name=”shield-checkmark-outline” color={C.mint}/>
+        <View style={{flex:1}}><Text style={styles.cardTitle}>Profile & privacy</Text><Text style={styles.muted}>Change name, photo, sponsor, trusted person.</Text></View>
+        <Icon name=”chevron-forward” color={C.muted}/>
+      </Pressable>
+
+      {hasSponsor && (
+        <Card style={styles.sponsorCard}>
+          <Text style={styles.mini}>YOUR SPONSOR</Text>
+          <View style={styles.rowBetween}>
+            <View style={{flex:1}}>
+              <Text style={styles.cardTitle}>{profile.sponsor.name}</Text>
+              <Text style={styles.muted}>{profile.sponsor.phone || 'No number saved yet'}</Text>
+            </View>
+            {profile.sponsor.phone && (
+              <View style={{flexDirection:'row',gap:9}}>
+                <Pressable onPress={()=>Linking.openURL(`tel:${profile.sponsor.phone}`)} style={styles.contactChip}><Icon name=”call-outline” size={18} color={C.ink}/></Pressable>
+                <Pressable onPress={()=>Linking.openURL(`sms:${profile.sponsor.phone}`)} style={[styles.contactChip,{backgroundColor:C.blue}]}><Icon name=”chatbubble-outline” size={18} color={C.ink}/></Pressable>
+              </View>
+            )}
+          </View>
+        </Card>
+      )}
+      {!hasSponsor && (
+        <Pressable onPress={editProfile} style={styles.privacyAction}>
+          <Icon name=”person-add-outline” color={C.muted}/>
+          <View style={{flex:1}}><Text style={styles.cardTitle}>Add your sponsor</Text><Text style={styles.muted}>One-tap call or text when you need support.</Text></View>
+          <Icon name=”chevron-forward” color={C.muted}/>
+        </Pressable>
+      )}
+
+      {hasTrusted && (
+        <View style={[styles.setting,{borderBottomWidth:0,backgroundColor:C.raised,borderRadius:14,padding:14,marginBottom:4}]}>
+          <Icon name=”shield-checkmark-outline” color={C.mint}/>
+          <View style={{flex:1}}><Text style={styles.cardTitle}>Trusted: {profile.trustedPerson.name}</Text><Text style={styles.muted}>Can see your recovery status.</Text></View>
+          <Icon name=”checkmark-circle” color={C.mint}/>
+        </View>
+      )}
+
+      {sobrietyDays !== null && (
+        <View style={styles.achievement}>
+          <Icon name=”flame” size={28} color={C.gold}/>
+          <View><Text style={styles.cardTitle}>Your rhythm</Text><Text style={styles.muted}>In recovery, one day at a time.</Text></View>
+        </View>
+      )}
+
+      <Pressable onPress={goJournal} style={styles.privacyAction}>
+        <Icon name=”book-outline” color={C.gold}/>
+        <View style={{flex:1}}><Text style={styles.cardTitle}>Your journal</Text><Text style={styles.muted}>{entries.length} {entries.length===1?'entry':'entries'} · private</Text></View>
+        <Icon name=”chevron-forward” color={C.muted}/>
+      </Pressable>
+
+      <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
+      {[
+        ['meetings','Meeting reminders','Heads-up before a meeting starts',prefs.meetings,toggleMeetings],
+        ['insight','Daily inspiration','A quiet message each morning at 9 AM',prefs.insight,toggleInsight],
+        ['checkin','Evening check-in','Reminder to journal at 8 PM',prefs.checkin,toggleCheckin],
+        ['circleNotifs','Circle & DM alerts','Notify me on replies to my posts',prefs.circleNotifs,v=>setPrefs(p=>({...p,circleNotifs:v}))],
+      ].map(([key,title,desc,val,toggle])=>(
+        <View key={key} style={styles.setting}>
+          <View style={{flex:1}}><Text style={styles.cardTitle}>{title}</Text><Text style={styles.muted}>{desc}</Text></View>
+          <Switch value={val} onValueChange={toggle} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={val?C.mint:C.muted}/>
+        </View>
+      ))}
+      <Button label=”Send a demo notification” onPress={async()=>{ const r=await scheduleDemoInsight(); say(r.ok?'Check in 8 seconds':r.reason); }} kind=”dark” icon=”notifications-outline”/>
+
+      <Text style={styles.sectionTitle}>PRIVACY</Text>
+      <View style={styles.setting}>
+        <Icon name=”eye-off-outline” color={C.muted}/>
+        <View style={{flex:1}}><Text style={styles.cardTitle}>Anonymous mode</Text><Text style={styles.muted}>Hide your profile from community search.</Text></View>
+        <Switch value={!!profile.privacyMode} onValueChange={togglePrivacy} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={profile.privacyMode?C.mint:C.muted}/>
+      </View>
+
+      <Text style={styles.sectionTitle}>YOUR NETWORK</Text>
+      <Card>
+        <Text style={styles.mini}>INVITE A FRIEND</Text>
+        <Text style={styles.muted}>Share Northstar with someone in your recovery network.</Text>
+        <Button label=”Invite a friend” onPress={inviteFriend} icon=”person-add-outline”/>
+      </Card>
+
       <Text style={styles.sectionTitle}>SUPPORT NORTHSTAR</Text>
       <SupportNorthstar say={say}/>
-      <Text style={styles.sectionTitle}>REMINDERS, ON YOUR TERMS</Text>
-      {[['meetings','Meeting reminders','A gentle heads-up before saved rooms',prefs.meetings,toggleMeetings],['insight','Daily insight','One quiet thought, once a day at 9 AM',prefs.insight,toggleInsight]].map(([key,title,desc,val,toggle])=>
-        <View key={key} style={styles.setting}><View style={{flex:1}}><Text style={styles.cardTitle}>{title}</Text><Text style={styles.muted}>{desc}</Text></View><Switch value={val} onValueChange={toggle} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={val?C.mint:C.muted}/></View>
-      )}
-      <Button label="Send a demo insight now" onPress={async()=>{ const r=await scheduleDemoInsight(); say(r.ok?'Check for a notification in 8 seconds':r.reason); }} kind="dark" icon="notifications-outline"/>
+
       <Text style={styles.sectionTitle}>LITERATURE & RESOURCES</Text>
-      <Card><Text style={styles.cardTitle}>Official CMA literature</Text><Text style={styles.muted}>Open the Crystal Meth Anonymous resource library in your browser.</Text><Pressable onPress={()=>Linking.openURL('https://www.crystalmeth.org/')} style={styles.inlineAction}><Text style={styles.inlineText}>Visit crystalmeth.org</Text><Icon name="open-outline" size={16} color={C.mint}/></Pressable></Card>
-      <Pressable onPress={onSignOut} style={[styles.setting,{borderBottomWidth:0,justifyContent:'center',gap:8,marginTop:8}]}><Icon name="log-out-outline" color={C.muted} size={18}/><Text style={[styles.muted,{fontWeight:'700'}]}>Sign out</Text></Pressable>
+      <Card>
+        <Text style={styles.cardTitle}>Official CMA literature</Text>
+        <Text style={styles.muted}>The Crystal Meth Anonymous resource library.</Text>
+        <Pressable onPress={()=>Linking.openURL('https://www.crystalmeth.org/')} style={styles.inlineAction}>
+          <Text style={styles.inlineText}>Visit crystalmeth.org</Text>
+          <Icon name=”open-outline” size={16} color={C.mint}/>
+        </Pressable>
+      </Card>
+
+      <Pressable onPress={onSignOut} style={[styles.setting,{borderBottomWidth:0,justifyContent:'center',gap:8,marginTop:8}]}>
+        <Icon name=”log-out-outline” color={C.muted} size={18}/>
+        <Text style={[styles.muted,{fontWeight:'700'}]}>Sign out</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -1049,4 +1289,16 @@ const styles = StyleSheet.create({
   readingActions:{flexDirection:'row',gap:10},
   readingAction:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:11,borderRadius:12,borderWidth:1,borderColor:C.line,backgroundColor:C.raised},
   readingActionText:{color:C.warm,fontWeight:'800',fontSize:13},
+  revealBtn:{flexDirection:'row',alignItems:'center',gap:4,paddingHorizontal:9,paddingVertical:5,backgroundColor:C.raised,borderRadius:9,borderWidth:1,borderColor:C.line},
+  revealText:{color:C.muted,fontSize:11,fontWeight:'800'},
+  sponsorCard:{borderColor:'rgba(93,224,166,.4)',borderWidth:1.5},
+  sponsorQuick:{flexDirection:'row',alignItems:'center',gap:12,padding:14,backgroundColor:'#16333a',borderRadius:15,borderWidth:1,borderColor:'rgba(93,224,166,.4)'},
+  sponsorQuickName:{color:C.warm,fontSize:15,fontWeight:'800'},
+  sponsorQuickSub:{color:C.mint,fontSize:11,marginTop:2},
+  contactChip:{width:36,height:36,borderRadius:11,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'},
+  newsCard:{flexDirection:'row',alignItems:'flex-start',gap:12,padding:14,backgroundColor:C.surface,borderRadius:14,borderWidth:1,borderColor:C.line,marginBottom:4},
+  newsBadge:{width:34,height:34,borderRadius:10,backgroundColor:C.mint,alignItems:'center',justifyContent:'center',marginTop:2},
+  newsTitle:{color:C.warm,fontSize:14,fontWeight:'800',lineHeight:19,marginBottom:3},
+  newsSummary:{color:C.muted,fontSize:12,lineHeight:18,marginBottom:3},
+  newsSource:{color:C.blue,fontSize:10,fontWeight:'800',letterSpacing:.6},
 });
