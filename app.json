@@ -39,6 +39,7 @@
     "android": {
       "package": "com.northstar.recovery",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/northstar-app-icon.png",
         "backgroundColor": "#101827"
       }
     },
