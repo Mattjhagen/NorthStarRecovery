@@ -1,19 +1,28 @@
 #!/usr/bin/env bash
-# Syncs assets/soundscapes/ to the private S3 bucket.
+# Syncs soundscapes/ to the private S3 bucket.
 # Run after adding new files: ./aws/sync-soundscapes.sh
 # Requires AWS CLI authenticated (aws sso login).
 
 set -euo pipefail
 
 BUCKET="northstar-recovery-soundscapes-soundscapebucket-aoh06vis4c8n"
-LOCAL="$(cd "$(dirname "$0")/.." && pwd)/assets/soundscapes"
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "Syncing $LOCAL → s3://$BUCKET/soundscapes/"
+echo "Syncing soundscapes → s3://$BUCKET/soundscapes/"
 
-aws s3 sync "$LOCAL" "s3://$BUCKET/soundscapes/" \
-  --delete \
-  --exclude "*.DS_Store" \
-  --content-type "audio/wav"
+# Sync root soundscapes/ folder (primary)
+if [ -d "$REPO/soundscapes" ]; then
+  aws s3 sync "$REPO/soundscapes/" "s3://$BUCKET/soundscapes/" \
+    --exclude "*.DS_Store" \
+    --content-type "audio/wav"
+fi
+
+# Also sync assets/soundscapes/ if it has files
+if [ -d "$REPO/assets/soundscapes" ]; then
+  aws s3 sync "$REPO/assets/soundscapes/" "s3://$BUCKET/soundscapes/" \
+    --exclude "*.DS_Store" \
+    --content-type "audio/wav"
+fi
 
 echo ""
 echo "Done. Files are served at:"
