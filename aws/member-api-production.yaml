@@ -1,0 +1,327 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Production identity and minimal member API for Northstar Recovery in Ohio.
+
+Resources:
+  MemberProfiles:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: memberId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: memberId
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      TableName: northstar-recovery-production-profiles
+
+  JournalEntries:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: memberId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: memberId
+          KeyType: HASH
+        - AttributeName: createdAt
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      TableName: northstar-recovery-production-journal
+
+  MemberUserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: northstar-recovery-production
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      UsernameConfiguration:
+        CaseSensitive: false
+      MfaConfiguration: OPTIONAL
+      EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 3
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      UserPoolAddOns:
+        AdvancedSecurityMode: AUDIT
+
+  MemberAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: northstar-recovery-mobile-production
+      UserPoolId: !Ref MemberUserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+
+  ApiLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/apigateway/northstar-recovery-production
+      RetentionInDays: 90
+
+  MemberApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: member-profile-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem]
+                Resource: !GetAtt MemberProfiles.Arn
+              - Effect: Allow
+                Action: [dynamodb:PutItem, dynamodb:Query]
+                Resource: !GetAtt JournalEntries.Arn
+              - Effect: Allow
+                Action: cognito-idp:AdminDeleteUser
+                Resource: !GetAtt MemberUserPool.Arn
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: '*'
+
+  MemberApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: northstar-recovery-production-member-api
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt MemberApiRole.Arn
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          PROFILES_TABLE: !Ref MemberProfiles
+          JOURNAL_TABLE: !Ref JournalEntries
+          USER_POOL_ID: !Ref MemberUserPool
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import boto3
+          from boto3.dynamodb.conditions import Key
+
+          table = boto3.resource('dynamodb').Table(os.environ['PROFILES_TABLE'])
+          journal = boto3.resource('dynamodb').Table(os.environ['JOURNAL_TABLE'])
+          cognito = boto3.client('cognito-idp')
+
+          def reply(status, body=None):
+              return {
+                  'statusCode': status,
+                  'headers': {'content-type': 'application/json', 'cache-control': 'no-store'},
+                  'body': '' if body is None else json.dumps(body),
+              }
+
+          def handler(event, context):
+              path = event['requestContext']['http']['path']
+              method = event['requestContext']['http']['method']
+              if path == '/v1/health':
+                  return reply(200, {'status': 'ok'})
+
+              claims = event['requestContext']['authorizer']['jwt']['claims']
+              member_id = claims['sub']
+              if path == '/v1/journal':
+                  if method == 'GET':
+                      entries = journal.query(
+                          KeyConditionExpression=Key('memberId').eq(member_id),
+                          ScanIndexForward=False,
+                          Limit=50,
+                      ).get('Items', [])
+                      return reply(200, {'entries': entries})
+                  if method == 'POST':
+                      try:
+                          body = json.loads(event.get('body') or '{}')
+                          text = body['text'].strip()
+                          mood = body.get('mood', 'steady')
+                          created_at = body['createdAt']
+                          if not (1 <= len(text) <= 5000 and mood in ['heavy', 'tender', 'steady', 'hopeful'] and len(created_at) <= 40):
+                              raise ValueError()
+                      except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+                          return reply(400, {'error': 'invalid_journal_entry'})
+                      entry = {'memberId': member_id, 'createdAt': created_at, 'text': text, 'mood': mood}
+                      journal.put_item(Item=entry)
+                      return reply(201, {'entry': entry})
+                  return reply(405, {'error': 'method_not_allowed'})
+
+              if path != '/v1/me':
+                  return reply(404, {'error': 'not_found'})
+
+              if method == 'GET':
+                  item = table.get_item(Key={'memberId': member_id}).get('Item')
+                  return reply(200, {'profile': item or {'memberId': member_id, 'preferences': {}}})
+
+              if method == 'PUT':
+                  try:
+                      body = json.loads(event.get('body') or '{}')
+                      profile = body['profile']
+                      allowed = {'pseudonym', 'bio', 'dateOfBirth', 'gender', 'groupPreference', 'sobrietyDate'}
+                      if not isinstance(profile, dict) or any(key not in allowed for key in profile):
+                          raise ValueError()
+                      if len(profile.get('pseudonym', '')) > 40 or len(profile.get('bio', '')) > 280:
+                          raise ValueError()
+                      if profile.get('gender') not in [None, 'woman', 'man', 'nonbinary', 'self-describe', 'prefer-not-to-say']:
+                          raise ValueError()
+                      if profile.get('groupPreference') not in [None, 'women', 'men', 'all']:
+                          raise ValueError()
+                  except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+                      return reply(400, {'error': 'invalid_profile'})
+                  existing = table.get_item(Key={'memberId': member_id}).get('Item', {'memberId': member_id})
+                  existing.update(profile)
+                  table.put_item(Item=existing)
+                  return reply(200, {'profile': existing})
+
+              if method == 'DELETE':
+                  table.delete_item(Key={'memberId': member_id})
+                  username = claims.get('cognito:username')
+                  if not username:
+                      return reply(409, {'error': 'account_deletion_unavailable'})
+                  cognito.admin_delete_user(UserPoolId=os.environ['USER_POOL_ID'], Username=username)
+                  return reply(204)
+              return reply(405, {'error': 'method_not_allowed'})
+
+  MemberApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: northstar-recovery-production
+      ProtocolType: HTTP
+      DisableExecuteApiEndpoint: false
+
+  MemberApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref MemberApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt MemberApiFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  MemberApiAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref MemberApi
+      AuthorizerType: JWT
+      IdentitySource: ['$request.header.Authorization']
+      JwtConfiguration:
+        Audience: [!Ref MemberAppClient]
+        Issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${MemberUserPool}'
+      Name: northstar-member-jwt
+
+  HealthRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: GET /v1/health
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  MemberGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: GET /v1/me
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  MemberPutRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: PUT /v1/me
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  MemberDeleteRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: DELETE /v1/me
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  JournalListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: GET /v1/journal
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  JournalCreateRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: POST /v1/journal
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  DefaultStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref MemberApi
+      StageName: '$default'
+      AutoDeploy: true
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiLogs.Arn
+        Format: '{"requestId":"$context.requestId","status":"$context.status","routeKey":"$context.routeKey","integrationError":"$context.integrationErrorMessage"}'
+
+  ApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref MemberApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MemberApi}/*/*'
+
+Outputs:
+  ApiBaseUrl:
+    Description: Public API base URL. All member routes require a Cognito JWT.
+    Value: !Sub 'https://${MemberApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+  CognitoUserPoolId:
+    Value: !Ref MemberUserPool
+  CognitoAppClientId:
+    Value: !Ref MemberAppClient

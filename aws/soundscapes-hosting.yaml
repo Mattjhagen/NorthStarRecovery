@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Private soundscape hosting for Northstar Recovery.
+Resources:
+  SoundscapeBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+  SoundscapeOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        # CloudFront OAC names are account-wide, so include the account and
+        # region to avoid colliding with an earlier stack attempt.
+        Name: !Sub "${AWS::StackName}-${AWS::AccountId}-${AWS::Region}-s3-oac"
+        Description: CloudFront-only access to Northstar soundscapes.
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  SoundscapeDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: SoundscapeS3Origin
+            DomainName: !GetAtt SoundscapeBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SoundscapeOriginAccessControl.Id
+            S3OriginConfig: {}
+        DefaultCacheBehavior:
+          TargetOriginId: SoundscapeS3Origin
+          ViewerProtocolPolicy: https-only
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+  SoundscapeBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SoundscapeBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${SoundscapeBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SoundscapeDistribution}"
+Outputs:
+  SoundscapeBucketName:
+    Description: Private S3 bucket for uploaded audio.
+    Value: !Ref SoundscapeBucket
+  CloudFrontDomainName:
+    Description: HTTPS domain for streaming soundscapes.
+    Value: !GetAtt SoundscapeDistribution.DomainName
+  SoundscapeBaseUrl:
+    Description: Base URL for audio objects uploaded under soundscapes/.
+    Value: !Sub "https://${SoundscapeDistribution.DomainName}/soundscapes/"
