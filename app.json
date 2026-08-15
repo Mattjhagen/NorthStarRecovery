@@ -24,7 +24,13 @@
       ],
       "expo-font",
       "expo-asset",
-      "expo-iap"
+      "expo-iap",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Northstar Recovery uses your photo library so you can set an optional profile photo."
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,
@@ -33,7 +39,8 @@
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
           "audio"
-        ]
+        ],
+        "NSPhotoLibraryUsageDescription": "Northstar Recovery uses your photo library so you can set an optional profile photo."
       }
     },
     "android": {
