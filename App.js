@@ -54,17 +54,17 @@ const LEARN_MODULES = [
   { id:2, title:'Your first meeting', xp:120, icon:'people-outline',
     copy:'Know what to expect before you walk in or join.',
     steps:['Choose a format','Arrive your way','Reflect after'],
-    detail:"Meetings can feel intimidating. This module takes away the mystery so you can show up in whatever way feels safe â€” whether that's camera off, muted, or just listening.",
+    detail:"Meetings can feel intimidating. This module takes away the mystery so you can show up in whatever way feels safe â€" whether that's camera off, muted, or just listening.",
   },
   { id:3, title:'Managing cravings', xp:140, icon:'pulse-outline',
     copy:'Understand your cravings and learn to move through them.',
     steps:['Name the trigger','Ride the wave (urge surfing)','Use HALT to check in'],
-    detail:"Cravings are temporary â€” even when they don't feel that way. The HALT check (Hungry, Angry, Lonely, Tired) is one of the most practical tools in early recovery.",
+    detail:"Cravings are temporary â€" even when they don't feel that way. The HALT check (Hungry, Angry, Lonely, Tired) is one of the most practical tools in early recovery.",
   },
   { id:4, title:'Stress & anxiety', xp:160, icon:'leaf-outline',
     copy:'Simple tools for when everything feels like too much.',
     steps:['5-4-3-2-1 grounding','Box breathing','Name what\'s real vs. what\'s fear'],
-    detail:"Stress is normal. Anxiety in early recovery is extremely common. This module gives you grounding techniques that work in real moments â€” at home, at work, anywhere.",
+    detail:"Stress is normal. Anxiety in early recovery is extremely common. This module gives you grounding techniques that work in real moments â€" at home, at work, anywhere.",
   },
   { id:5, title:'Rebuilding your sleep', xp:160, icon:'moon-outline',
     copy:'Recovery and rest are deeply connected.',
@@ -84,12 +84,12 @@ const LEARN_MODULES = [
   { id:8, title:'Service & purpose', xp:220, icon:'heart-outline',
     copy:'Giving back is part of getting better.',
     steps:['What service means in Step 12','Find your way to give','One small act this week'],
-    detail:"Step 12 is about carrying the message. This module explores what service looks like in daily life â€” and why helping others is one of the most powerful tools for your own recovery.",
+    detail:"Step 12 is about carrying the message. This module explores what service looks like in daily life â€" and why helping others is one of the most powerful tools for your own recovery.",
   },
   { id:9, title:'Relapse prevention', xp:240, icon:'shield-outline',
     copy:'Preparation and self-compassion, together.',
     steps:['Know your warning signs','Make your plan','If it happens: next right step'],
-    detail:"Relapse is not failure â€” it\'s data. This module helps you identify your early warning signs and build a compassionate, practical response plan before you need it.",
+    detail:"Relapse is not failure â€" it\'s data. This module helps you identify your early warning signs and build a compassionate, practical response plan before you need it.",
   },
 ];
 
@@ -174,12 +174,7 @@ async function fetchRecoveryNews() {
   return [];
 }
 
-const STRIPE_LINKS = {
-  small:  'https://buy.stripe.com/test_small',
-  medium: 'https://buy.stripe.com/test_medium',
-  large:  'https://buy.stripe.com/test_large',
-};
-const VENMO_USER = 'NorthstarRecovery';
+const VENMO_USER = 'rooteddaily';
 
 const GENDER_TO_API = { 'Woman':'woman','Man':'man','Nonbinary':'nonbinary','Prefer not to say':'prefer-not-to-say' };
 const API_TO_GENDER = Object.fromEntries(Object.entries(GENDER_TO_API).map(([k,v])=>[v,k]));
@@ -354,11 +349,11 @@ export default function App() {
   );
 }
 
-// â”€â”€â”€ SPLASH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ SPLASH â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const SPLASH_MESSAGES = [
   'You are not alone in this.','Every step forward counts, no matter how small.',
   "Courage doesn't always roar. Sometimes it shows up quietly.",'Today is a new beginning.',
-  'Your story is still being written.',"Healing is not linear â€” and that's okay.",
+  'Your story is still being written.',"Healing is not linear â€" and that's okay.",
   'You deserve a life you want to live.','One day at a time is enough.',
   'There is room for you here.','Recovery is possible. You are proof.',
 ];
@@ -403,7 +398,7 @@ function SplashScreen() {
   );
 }
 
-// â”€â”€â”€ PROFILE EDITOR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ PROFILE EDITOR â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function ProfileEditor({ profile, onSave, onCancel }) {
   const [draft, setDraft] = useState(profile);
   const pickPhoto = async () => {
@@ -417,7 +412,7 @@ function ProfileEditor({ profile, onSave, onCancel }) {
       <ScrollView contentContainerStyle={styles.onboardScroll}>
         <View style={styles.rowBetween}><Pressable onPress={onCancel}><Icon name="close" color={C.warm}/></Pressable><Text style={styles.onboardKicker}>PROFILE & PRIVACY</Text></View>
         <Text style={styles.onboardTitle}>Only what feels right.</Text>
-        <Text style={styles.onboardCopy}>Your pseudonym is what others may see â€” not your legal name. Recovery details stay private.</Text>
+        <Text style={styles.onboardCopy}>Your pseudonym is what others may see â€" not your legal name. Recovery details stay private.</Text>
         <Pressable onPress={pickPhoto} style={styles.photoRow}>
           <Avatar photo={draft.photo} initial={(draft.pseudonym||'?').charAt(0).toUpperCase()} size={72} radius={22}/>
           <View style={{flex:1}}><Text style={styles.cardTitle}>Profile photo</Text><Text style={styles.muted}>Optional Â· tap to choose from your library</Text></View>
@@ -430,27 +425,27 @@ function ProfileEditor({ profile, onSave, onCancel }) {
         <View style={styles.choiceWrap}>{['Woman','Man','Nonbinary','Prefer not to say'].map(x=><Choice key={x} label={x} active={draft.gender===x} onPress={()=>setDraft(p=>({...p,gender:x}))}/>)}</View>
         <Text style={styles.fieldLabel}>GROUP PREFERENCE</Text>
         <View style={styles.choiceWrap}>{['Women-only','Men-only','All groups'].map(x=><Choice key={x} label={x} active={draft.groupPreference===x} onPress={()=>setDraft(p=>({...p,groupPreference:x}))}/>)}</View>
-        <Field label=”SOBRIETY DATE (OPTIONAL)” value={draft.sobrietyDate} onChange={v=>setDraft(p=>({...p,sobrietyDate:v}))} placeholder=”MM/DD/YYYY”/>
+        <Field label="SOBRIETY DATE (OPTIONAL)" value={draft.sobrietyDate} onChange={v=>setDraft(p=>({...p,sobrietyDate:v}))} placeholder="MM/DD/YYYY"/>
         <Text style={[styles.onboardKicker,{marginTop:8}]}>SPONSOR (OPTIONAL)</Text>
         <Text style={[styles.muted,{marginBottom:4}]}>Save your sponsor's info for one-tap support.</Text>
-        <Field label=”SPONSOR NAME” value={draft.sponsor?.name||''} onChange={v=>setDraft(p=>({...p,sponsor:{...p.sponsor,name:v}}))} placeholder=”Their name” autoCapitalize=”words”/>
-        <Field label=”SPONSOR PHONE” value={draft.sponsor?.phone||''} onChange={v=>setDraft(p=>({...p,sponsor:{...p.sponsor,phone:v}}))} placeholder=”+1 (555) 000-0000”/>
+        <Field label="SPONSOR NAME" value={draft.sponsor?.name||''} onChange={v=>setDraft(p=>({...p,sponsor:{...p.sponsor,name:v}}))} placeholder="Their name" autoCapitalize="words"/>
+        <Field label="SPONSOR PHONE" value={draft.sponsor?.phone||''} onChange={v=>setDraft(p=>({...p,sponsor:{...p.sponsor,phone:v}}))} placeholder="+1 (555) 000-0000"/>
         <Text style={[styles.onboardKicker,{marginTop:8}]}>TRUSTED PERSON (OPTIONAL)</Text>
         <Text style={[styles.muted,{marginBottom:4}]}>Someone who can check on you if they're concerned.</Text>
-        <Field label=”TRUSTED PERSON NAME” value={draft.trustedPerson?.name||''} onChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,name:v}}))} placeholder=”Their name” autoCapitalize=”words”/>
-        <Field label=”TRUSTED PERSON PHONE” value={draft.trustedPerson?.phone||''} onChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,phone:v}}))} placeholder=”+1 (555) 000-0000”/>
+        <Field label="TRUSTED PERSON NAME" value={draft.trustedPerson?.name||''} onChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,name:v}}))} placeholder="Their name" autoCapitalize="words"/>
+        <Field label="TRUSTED PERSON PHONE" value={draft.trustedPerson?.phone||''} onChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,phone:v}}))} placeholder="+1 (555) 000-0000"/>
         <View style={[styles.setting,{borderBottomWidth:0,marginTop:4}]}>
           <View style={{flex:1}}><Text style={styles.cardTitle}>Allow trusted person access</Text><Text style={styles.muted}>They can see your check-in status.</Text></View>
           <Switch value={!!draft.trustedPerson?.enabled} onValueChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,enabled:v}}))} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={draft.trustedPerson?.enabled?C.mint:C.muted}/>
         </View>
-        <Button label=”Save profile” onPress={()=>onSave(draft)} icon=”checkmark”/>
+        <Button label="Save profile" onPress={()=>onSave(draft)} icon="checkmark"/>
         <Pressable onPress={onCancel} style={styles.skip}><Text style={styles.textButtonLabel}>Cancel</Text></Pressable>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// â”€â”€â”€ ONBOARDING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ ONBOARDING â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function Onboarding({ onComplete }) {
   const [mode, setMode] = useState('welcome');
   const [busy, setBusy] = useState(false);
@@ -480,7 +475,7 @@ function Onboarding({ onComplete }) {
   if (mode==='welcome') return (
     <SafeAreaView style={styles.onboardSafe}><StatusBar style="light"/>
       <View style={styles.onboardStar}><Icon name="compass" size={40} color={C.mint}/></View>
-      <View style={styles.welcomeBody}><Text style={styles.brand}>NORTHSTAR</Text><Text style={styles.welcomeTitle}>A quiet place to find your way back.</Text><Text style={styles.welcomeCopy}>Support, reflection, and connection â€” at a pace that belongs to you.</Text></View>
+      <View style={styles.welcomeBody}><Text style={styles.brand}>NORTHSTAR</Text><Text style={styles.welcomeTitle}>A quiet place to find your way back.</Text><Text style={styles.welcomeCopy}>Support, reflection, and connection â€" at a pace that belongs to you.</Text></View>
       <View style={styles.welcomeBottom}><Button label="Create an account" onPress={()=>setMode('create')} icon="arrow-forward"/><Pressable onPress={()=>setMode('signin')} style={styles.textButton}><Text style={styles.textButtonLabel}>I already have an account</Text><Icon name="arrow-forward" size={16} color={C.mint}/></Pressable></View>
     </SafeAreaView>
   );
@@ -530,7 +525,7 @@ function Onboarding({ onComplete }) {
   );
 }
 
-// â”€â”€â”€ TODAY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ TODAY â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function Today({ say, go, profile, sobrietyDays, meetings }) {
   const name = profile.pseudonym || 'friend';
   const next = nextMeeting(meetings);
@@ -625,7 +620,7 @@ function Today({ say, go, profile, sobrietyDays, meetings }) {
   );
 }
 
-// â”€â”€â”€ MEETINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ MEETINGS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function Meetings({ say, profile, meetings, loading }) {
   const [filter, setFilter] = useState('All');
   const [query, setQuery] = useState('');
@@ -702,7 +697,7 @@ function Meetings({ say, profile, meetings, loading }) {
   );
 }
 
-// â”€â”€â”€ LEARN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ LEARN â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function Learn({ say, onReadings, news }) {
   const [complete, setComplete] = useState(1);
   const [open, setOpen] = useState(1);
@@ -743,7 +738,7 @@ function Learn({ say, onReadings, news }) {
               <Text style={styles.moduleCopy}>{m.copy}</Text>
               <Text style={[styles.muted,{lineHeight:20,marginBottom:4}]}>{m.detail}</Text>
               {m.steps.map(s=><Text key={s} style={styles.step}>â€¢ {s}</Text>)}
-              <Button label={done?'Review module':'Complete module'} onPress={()=>{if(!done)setComplete(m.id);say(done?'Module opened for review':`${m.title} complete â€” ${m.xp} XP earned`);}} icon={done?'refresh':'checkmark'}/>
+              <Button label={done?'Review module':'Complete module'} onPress={()=>{if(!done)setComplete(m.id);say(done?'Module opened for review':`${m.title} complete â€" ${m.xp} XP earned`);}} icon={done?'refresh':'checkmark'}/>
             </View>}
           </Card>
         );
@@ -753,13 +748,13 @@ function Learn({ say, onReadings, news }) {
         <Text style={[styles.muted,{marginBottom:4}]}>From NIDA — the National Institute on Drug Abuse.</Text>
         {news.map(item=>(
           <Pressable key={item.id} onPress={()=>Linking.openURL(item.link)} style={styles.newsCard}>
-            <View style={styles.newsBadge}><Icon name=”newspaper-outline” size={16} color={C.ink}/></View>
+            <View style={styles.newsBadge}><Icon name="newspaper-outline" size={16} color={C.ink}/></View>
             <View style={{flex:1}}>
               <Text style={styles.newsTitle} numberOfLines={2}>{item.title}</Text>
               {item.summary?<Text style={styles.newsSummary} numberOfLines={3}>{item.summary}</Text>:null}
               <Text style={styles.newsSource}>{item.source} · {item.pubDate?.slice(0,10)}</Text>
             </View>
-            <Icon name=”open-outline” size={15} color={C.muted}/>
+            <Icon name="open-outline" size={15} color={C.muted}/>
           </Pressable>
         ))}
       </>}
@@ -767,7 +762,7 @@ function Learn({ say, onReadings, news }) {
   );
 }
 
-// â”€â”€â”€ CALM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ CALM â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
   const status = useAudioPlayerStatus(player);
   const [minutes, setMinutes] = useState(10);
@@ -844,7 +839,7 @@ function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
   );
 }
 
-// Breathing guide â€” now the hero of the Calm screen, not a modal
+// Breathing guide â€" now the hero of the Calm screen, not a modal
 function BreathingGuide({ isPlaying }) {
   const pulse = useRef(new Animated.Value(.72)).current;
   const [phase, setPhase] = useState('Breathe in');
@@ -876,7 +871,7 @@ function BreathingGuide({ isPlaying }) {
   );
 }
 
-// â”€â”€â”€ CONNECT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ CONNECT â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function Connect({ say }) {
   const [posts, setPosts] = useState([]);
   const [blocked, setBlocked] = useState([]);
@@ -894,7 +889,7 @@ function Connect({ say }) {
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <Text style={styles.eyebrow}>PRIVATE COMMUNITY</Text><Text style={styles.h1}>The circle</Text>
-      <Text style={styles.intro}>Questions, stories, and small truths â€” held with care.</Text>
+      <Text style={styles.intro}>Questions, stories, and small truths â€" held with care.</Text>
       <View style={styles.standard}><Icon name="shield-checkmark" color={C.mint}/><Text style={styles.standardText}>No advice as authority. No pressure to share. If someone feels unsafe, block and report.</Text></View>
       <Pressable style={styles.compose} onPress={()=>setCompose(true)}><Icon name="create-outline" color={C.ink}/><Text style={styles.composeText}>Share with the circle</Text></Pressable>
       {visiblePosts.map(post=>(
@@ -963,7 +958,7 @@ function Connect({ say }) {
   );
 }
 
-// â”€â”€â”€ JOURNAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ JOURNAL â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function Journal({ say, entries, onAdd }) {
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState('');
@@ -993,26 +988,16 @@ function Journal({ say, entries, onAdd }) {
   );
 }
 
-// â”€â”€â”€ SUPPORT CARD (Stripe + Venmo) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ SUPPORT CARD (Stripe + Venmo) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function SupportNorthstar({ say }) {
   const donate = (amount, label) => {
-    Alert.alert(`Support Northstar — ${label}`, 'Choose how you want to give.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Pay with card (Stripe)', onPress: () => {
-        const links = { '$2': STRIPE_LINKS.small, '$5': STRIPE_LINKS.medium, '$10': STRIPE_LINKS.large };
-        const url = links[label] || STRIPE_LINKS.small;
-        Linking.openURL(url).catch(() => say('Stripe checkout will be available soon.'));
-      }},
-      { text: 'Pay with Venmo', onPress: () => {
-        Linking.openURL(`venmo://paycharge?txn=pay&recipients=${VENMO_USER}&amount=${amount}&note=Northstar Recovery Support`)
-          .catch(() => Linking.openURL(`https://venmo.com/${VENMO_USER}`));
-      }},
-    ]);
+    Linking.openURL(`venmo://paycharge?txn=pay&recipients=${VENMO_USER}&amount=${amount}&note=Northstar Recovery Support`)
+      .catch(() => Linking.openURL(`https://venmo.com/${VENMO_USER}`));
   };
   return (
     <Card style={styles.supportCard}>
       <View style={styles.row}>
-        <View style={styles.supportBadge}><Icon name=”heart” color={C.ink}/></View>
+        <View style={styles.supportBadge}><Icon name="heart" color={C.ink}/></View>
         <View style={{flex:1}}>
           <Text style={styles.cardTitle}>Support Northstar</Text>
           <Text style={styles.muted}>Optional support — every recovery tool stays free.</Text>
@@ -1031,7 +1016,7 @@ function SupportNorthstar({ say }) {
   );
 }
 
-// â”€â”€â”€ YOU â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ YOU â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries, saveProfile }) {
   const [prefs, setPrefs] = useState({ meetings:true, insight:false, checkin:false, circleNotifs:true });
   const name = profile.pseudonym || 'Northstar member';
@@ -1059,7 +1044,7 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
     say(val ? 'Anonymous mode on — your profile is hidden from community search.' : 'Anonymous mode off.');
   };
   const inviteFriend = () => Share.share({
-    message: “I'm using Northstar Recovery on my sobriety journey. It's gentle and private — join me.”,
+    message: "I'm using Northstar Recovery on my sobriety journey. It's gentle and private — join me.",
     title: 'Northstar Recovery',
   });
 
@@ -1074,12 +1059,12 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
           <Text style={styles.cardTitle}>{name}</Text>
           <Text style={styles.muted}>{sobrietyDays !== null ? 'In recovery · showing up' : 'Here in your own time'}</Text>
         </View>
-        <Pressable onPress={editProfile}><Icon name=”create-outline” color={C.mint}/></Pressable>
+        <Pressable onPress={editProfile}><Icon name="create-outline" color={C.mint}/></Pressable>
       </Card>
       <Pressable onPress={editProfile} style={styles.privacyAction}>
-        <Icon name=”shield-checkmark-outline” color={C.mint}/>
+        <Icon name="shield-checkmark-outline" color={C.mint}/>
         <View style={{flex:1}}><Text style={styles.cardTitle}>Profile & privacy</Text><Text style={styles.muted}>Change name, photo, sponsor, trusted person.</Text></View>
-        <Icon name=”chevron-forward” color={C.muted}/>
+        <Icon name="chevron-forward" color={C.muted}/>
       </Pressable>
 
       {hasSponsor && (
@@ -1092,8 +1077,8 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
             </View>
             {profile.sponsor.phone && (
               <View style={{flexDirection:'row',gap:9}}>
-                <Pressable onPress={()=>Linking.openURL(`tel:${profile.sponsor.phone}`)} style={styles.contactChip}><Icon name=”call-outline” size={18} color={C.ink}/></Pressable>
-                <Pressable onPress={()=>Linking.openURL(`sms:${profile.sponsor.phone}`)} style={[styles.contactChip,{backgroundColor:C.blue}]}><Icon name=”chatbubble-outline” size={18} color={C.ink}/></Pressable>
+                <Pressable onPress={()=>Linking.openURL(`tel:${profile.sponsor.phone}`)} style={styles.contactChip}><Icon name="call-outline" size={18} color={C.ink}/></Pressable>
+                <Pressable onPress={()=>Linking.openURL(`sms:${profile.sponsor.phone}`)} style={[styles.contactChip,{backgroundColor:C.blue}]}><Icon name="chatbubble-outline" size={18} color={C.ink}/></Pressable>
               </View>
             )}
           </View>
@@ -1101,31 +1086,31 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
       )}
       {!hasSponsor && (
         <Pressable onPress={editProfile} style={styles.privacyAction}>
-          <Icon name=”person-add-outline” color={C.muted}/>
+          <Icon name="person-add-outline" color={C.muted}/>
           <View style={{flex:1}}><Text style={styles.cardTitle}>Add your sponsor</Text><Text style={styles.muted}>One-tap call or text when you need support.</Text></View>
-          <Icon name=”chevron-forward” color={C.muted}/>
+          <Icon name="chevron-forward" color={C.muted}/>
         </Pressable>
       )}
 
       {hasTrusted && (
         <View style={[styles.setting,{borderBottomWidth:0,backgroundColor:C.raised,borderRadius:14,padding:14,marginBottom:4}]}>
-          <Icon name=”shield-checkmark-outline” color={C.mint}/>
+          <Icon name="shield-checkmark-outline" color={C.mint}/>
           <View style={{flex:1}}><Text style={styles.cardTitle}>Trusted: {profile.trustedPerson.name}</Text><Text style={styles.muted}>Can see your recovery status.</Text></View>
-          <Icon name=”checkmark-circle” color={C.mint}/>
+          <Icon name="checkmark-circle" color={C.mint}/>
         </View>
       )}
 
       {sobrietyDays !== null && (
         <View style={styles.achievement}>
-          <Icon name=”flame” size={28} color={C.gold}/>
+          <Icon name="flame" size={28} color={C.gold}/>
           <View><Text style={styles.cardTitle}>Your rhythm</Text><Text style={styles.muted}>In recovery, one day at a time.</Text></View>
         </View>
       )}
 
       <Pressable onPress={goJournal} style={styles.privacyAction}>
-        <Icon name=”book-outline” color={C.gold}/>
+        <Icon name="book-outline" color={C.gold}/>
         <View style={{flex:1}}><Text style={styles.cardTitle}>Your journal</Text><Text style={styles.muted}>{entries.length} {entries.length===1?'entry':'entries'} · private</Text></View>
-        <Icon name=”chevron-forward” color={C.muted}/>
+        <Icon name="chevron-forward" color={C.muted}/>
       </Pressable>
 
       <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
@@ -1140,11 +1125,11 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
           <Switch value={val} onValueChange={toggle} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={val?C.mint:C.muted}/>
         </View>
       ))}
-      <Button label=”Send a demo notification” onPress={async()=>{ const r=await scheduleDemoInsight(); say(r.ok?'Check in 8 seconds':r.reason); }} kind=”dark” icon=”notifications-outline”/>
+      <Button label="Send a demo notification" onPress={async()=>{ const r=await scheduleDemoInsight(); say(r.ok?'Check in 8 seconds':r.reason); }} kind="dark" icon="notifications-outline"/>
 
       <Text style={styles.sectionTitle}>PRIVACY</Text>
       <View style={styles.setting}>
-        <Icon name=”eye-off-outline” color={C.muted}/>
+        <Icon name="eye-off-outline" color={C.muted}/>
         <View style={{flex:1}}><Text style={styles.cardTitle}>Anonymous mode</Text><Text style={styles.muted}>Hide your profile from community search.</Text></View>
         <Switch value={!!profile.privacyMode} onValueChange={togglePrivacy} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={profile.privacyMode?C.mint:C.muted}/>
       </View>
@@ -1153,7 +1138,7 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
       <Card>
         <Text style={styles.mini}>INVITE A FRIEND</Text>
         <Text style={styles.muted}>Share Northstar with someone in your recovery network.</Text>
-        <Button label=”Invite a friend” onPress={inviteFriend} icon=”person-add-outline”/>
+        <Button label="Invite a friend" onPress={inviteFriend} icon="person-add-outline"/>
       </Card>
 
       <Text style={styles.sectionTitle}>SUPPORT NORTHSTAR</Text>
@@ -1165,19 +1150,19 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
         <Text style={styles.muted}>The Crystal Meth Anonymous resource library.</Text>
         <Pressable onPress={()=>Linking.openURL('https://www.crystalmeth.org/')} style={styles.inlineAction}>
           <Text style={styles.inlineText}>Visit crystalmeth.org</Text>
-          <Icon name=”open-outline” size={16} color={C.mint}/>
+          <Icon name="open-outline" size={16} color={C.mint}/>
         </Pressable>
       </Card>
 
       <Pressable onPress={onSignOut} style={[styles.setting,{borderBottomWidth:0,justifyContent:'center',gap:8,marginTop:8}]}>
-        <Icon name=”log-out-outline” color={C.muted} size={18}/>
+        <Icon name="log-out-outline" color={C.muted} size={18}/>
         <Text style={[styles.muted,{fontWeight:'700'}]}>Sign out</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
-// â”€â”€â”€ READINGS LIBRARY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ READINGS LIBRARY â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 function ReadingsLibrary({ onClose }) {
   const [selected, setSelected] = useState(null);
   return (
@@ -1187,7 +1172,7 @@ function ReadingsLibrary({ onClose }) {
         <Pressable onPress={onClose} style={styles.iconBtn}><Icon name="close"/></Pressable>
       </View>
       <ScrollView contentContainerStyle={[styles.scroll,{paddingTop:8}]}>
-        <Text style={styles.intro}>Official CMA pamphlets â€” listen along or open the full PDF.</Text>
+        <Text style={styles.intro}>Official CMA pamphlets â€" listen along or open the full PDF.</Text>
         {READINGS.map(r=>(
           <Pressable key={r.id} onPress={()=>setSelected(r)} style={[styles.readingCard, selected?.id===r.id&&styles.readingCardActive]}>
             <View style={[styles.readingIcon,selected?.id===r.id&&{backgroundColor:C.ink}]}>
@@ -1266,7 +1251,7 @@ function ReadingPlayer({ reading, onClose }) {
   );
 }
 
-// â”€â”€â”€ STYLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ STYLES â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 const styles = StyleSheet.create({
   standard:{flexDirection:'row',gap:9,padding:13,borderLeftWidth:2,borderColor:C.mint,backgroundColor:'#16343a'}, standardText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, boardPost:{gap:11}, topic:{color:C.mint,fontSize:10,fontWeight:'900',letterSpacing:1.2}, postTime:{color:C.muted,fontSize:11}, tapHint:{color:C.blue,fontSize:11,marginTop:1}, commentAction:{flexDirection:'row',alignItems:'center',gap:7,paddingTop:11,borderTopWidth:1,borderColor:C.line}, commentActionText:{color:C.mint,fontSize:12,fontWeight:'800',flex:1}, boardEmpty:{minHeight:180,justifyContent:'center',alignItems:'center',gap:10,padding:24,borderWidth:1,borderColor:C.line,borderRadius:17}, memberHero:{flexDirection:'row',alignItems:'center',gap:13}, memberAvatar:{height:57,width:57,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, profileSafety:{flexDirection:'row',gap:9,padding:12,backgroundColor:'#17363a',borderRadius:12}, profileSafetyText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, dangerAction:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, dangerText:{color:C.gold,fontWeight:'800',fontSize:14}, postSheet:{height:'88%',paddingBottom:20}, threadScroll:{flexGrow:0,flexShrink:1}, threadContent:{gap:12,paddingBottom:8}, threadComposer:{gap:8,paddingTop:10,borderTopWidth:1,borderColor:C.line}, comment:{padding:11,backgroundColor:C.raised,borderRadius:11,gap:3}, commentName:{color:C.warm,fontWeight:'800',fontSize:13}, commentInput:{color:C.warm,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,minHeight:52,fontSize:14},
   safe:{flex:1,backgroundColor:C.ink}, topo:{position:'absolute',top:0,left:0,right:0,height:210,backgroundColor:'#172944',borderBottomLeftRadius:110,borderBottomRightRadius:40,opacity:.8}, header:{height:76,paddingHorizontal:20,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, brand:{color:C.warm,fontSize:15,fontWeight:'900',letterSpacing:2}, brandSub:{color:C.muted,fontSize:10,marginTop:3}, headerBtns:{flexDirection:'row',gap:9}, iconBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,borderRadius:12}, helpBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.mint,borderRadius:12}, body:{flex:1}, scroll:{padding:20,paddingBottom:28,gap:14}, eyebrow:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, mini:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, sectionTitle:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2,marginTop:7}, h1:{color:C.warm,fontSize:31,lineHeight:36,fontWeight:'900',letterSpacing:-.6}, intro:{color:C.muted,fontSize:15,lineHeight:22,marginTop:-7,marginBottom:3}, card:{backgroundColor:C.surface,borderWidth:1,borderColor:'rgba(157,173,197,.14)',padding:16,borderRadius:18,gap:12}, streak:{backgroundColor:'#202e42',flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderColor:'#466176'}, streakNum:{color:C.warm,fontSize:37,fontWeight:'900',marginTop:2}, streakUnit:{fontSize:16,color:C.muted}, muted:{color:C.muted,fontSize:13,lineHeight:19}, sun:{height:56,width:56,borderRadius:28,backgroundColor:'#344154',alignItems:'center',justifyContent:'center'}, rowBetween:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:12}, row:{flexDirection:'row',alignItems:'center',gap:18}, cardTitle:{color:C.warm,fontSize:16,fontWeight:'800',lineHeight:21}, remote:{padding:10,backgroundColor:'#183c3a',borderRadius:12}, button:{backgroundColor:C.mint,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:12,borderRadius:12,marginTop:1}, buttonDark:{backgroundColor:C.raised,borderWidth:1,borderColor:C.line}, buttonText:{color:C.ink,fontWeight:'900',fontSize:14}, quote:{color:C.warm,fontSize:18,lineHeight:27,fontWeight:'600',paddingHorizontal:7,paddingVertical:9}, actionRow:{flexDirection:'row',gap:10}, quick:{flex:1,minHeight:95,backgroundColor:C.raised,borderRadius:16,padding:14,justifyContent:'space-between'}, quickText:{color:C.warm,fontSize:14,fontWeight:'800'}, support:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, supportText:{color:C.gold,fontWeight:'800',fontSize:13}, supportCard:{borderColor:'rgba(93,224,166,.36)'}, supportBadge:{height:38,width:38,borderRadius:13,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, supportFinePrint:{color:C.muted,fontSize:12,lineHeight:17}, supportOptions:{flexDirection:'row',gap:8}, supportOption:{flex:1,backgroundColor:C.raised,borderWidth:1,borderColor:C.line,borderRadius:12,paddingVertical:11,alignItems:'center',gap:2}, supportPrice:{color:C.mint,fontSize:16,fontWeight:'900'}, supportOptionLabel:{color:C.muted,fontSize:9,fontWeight:'700',textAlign:'center'}, tabbar:{height:72,backgroundColor:'#141f31',borderTopWidth:1,borderColor:'#293850',flexDirection:'row',paddingHorizontal:2}, tab:{flex:1,alignItems:'center',justifyContent:'center',gap:3}, tabText:{color:C.muted,fontSize:8,fontWeight:'700'}, location:{flexDirection:'row',alignItems:'center',gap:7}, locationText:{color:C.warm,fontSize:13,fontWeight:'700'}, change:{color:C.mint,fontSize:12,fontWeight:'800',marginLeft:'auto'}, search:{flexDirection:'row',alignItems:'center',backgroundColor:C.surface,borderRadius:13,paddingHorizontal:13,borderWidth:1,borderColor:C.line}, input:{color:C.warm,height:46,flex:1,marginLeft:8,fontSize:14}, segmentScroll:{marginHorizontal:-20,paddingHorizontal:20,flexGrow:0}, segment:{paddingVertical:9,paddingHorizontal:14,marginRight:8,borderRadius:11,borderWidth:1,borderColor:C.line}, segmentActive:{backgroundColor:C.mint,borderColor:C.mint}, segmentText:{color:C.muted,fontWeight:'800',fontSize:13}, segmentTextActive:{color:C.ink}, results:{color:C.muted,fontSize:12,fontWeight:'700'}, meeting:{flexDirection:'row',gap:13}, time:{width:54,borderRightWidth:1,borderColor:C.line}, timeText:{color:C.warm,fontWeight:'900',fontSize:14}, timeZone:{color:C.muted,fontSize:10,marginTop:3}, meetingMeta:{color:C.blue,fontSize:12,fontWeight:'700',marginTop:2}, inlineAction:{flexDirection:'row',alignItems:'center',gap:5,marginTop:7}, inlineText:{color:C.mint,fontWeight:'800',fontSize:13}, empty:{alignItems:'center',paddingVertical:30}, xp:{backgroundColor:'#26304b',flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, xpNum:{color:C.gold,fontWeight:'900',fontSize:25,marginTop:3}, xpSmall:{fontSize:13,color:C.muted}, module:{gap:0}, moduleDot:{height:31,width:31,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,marginRight:11}, moduleDetail:{borderTopWidth:1,borderColor:C.line,marginTop:14,paddingTop:12,gap:7}, moduleCopy:{color:C.warm,lineHeight:20,fontSize:14,fontWeight:'700'}, step:{color:C.muted,fontSize:13}, calmTab:{flex:1}, hidden:{display:'none'}, playerCard:{alignItems:'center',paddingVertical:20,gap:8}, breathGuide:{height:220,width:220,alignSelf:'center',alignItems:'center',justifyContent:'center',marginVertical:8}, breathGuideOuter:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:2,borderColor:'rgba(93,224,166,.58)'}, breathGuideInner:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:1,borderColor:'rgba(117,184,255,.7)'}, breathGuideCenter:{alignItems:'center',gap:4}, breathPhase:{color:C.warm,fontSize:20,fontWeight:'900',marginTop:5}, breathCount:{color:C.muted,fontSize:12,textAlign:'center'}, timer:{color:C.warm,fontSize:38,fontWeight:'900',letterSpacing:1}, playButton:{alignSelf:'stretch',backgroundColor:C.mint,paddingVertical:13,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:9}, playText:{color:C.ink,fontSize:15,fontWeight:'900'}, sessionRow:{flexDirection:'row',gap:9}, session:{flex:1,paddingVertical:12,alignItems:'center',borderWidth:1,borderColor:C.line,borderRadius:12,backgroundColor:C.raised}, sessionActive:{backgroundColor:C.mint,borderColor:C.mint}, sessionText:{color:C.muted,fontWeight:'800'}, sessionTextActive:{color:C.ink}, visualRow:{flexDirection:'row',gap:8}, visualChoice:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,paddingVertical:10,borderRadius:11,borderWidth:1,borderColor:C.line,backgroundColor:C.raised}, visualChoiceActive:{backgroundColor:C.mint,borderColor:C.mint}, visualText:{color:C.muted,fontSize:12,fontWeight:'800'}, visualTextActive:{color:C.ink}, soundscapePicker:{flexDirection:'row',alignItems:'center',gap:10,padding:14,backgroundColor:C.raised,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapePickerText:{flex:1,color:C.warm,fontSize:14,fontWeight:'700'}, soundscapeRow:{flexDirection:'row',alignItems:'center',gap:12,padding:14,backgroundColor:C.surface,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapeRowActive:{backgroundColor:C.mint,borderColor:C.mint}, compose:{backgroundColor:C.mint,padding:14,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, composeText:{fontSize:14,color:C.ink,fontWeight:'900'}, postHead:{flexDirection:'row',alignItems:'center',gap:10}, avatar:{height:35,width:35,borderRadius:12,backgroundColor:'#476686',alignItems:'center',justifyContent:'center'}, avatarText:{color:C.warm,fontWeight:'900'}, postText:{color:C.warm,fontSize:15,lineHeight:22}, profile:{flexDirection:'row',alignItems:'center'}, bigAvatar:{width:56,height:56,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, bigAvatarText:{color:C.ink,fontSize:22,fontWeight:'900'}, achievement:{flexDirection:'row',alignItems:'center',gap:12,padding:14,borderWidth:1,borderColor:'#66583d',borderRadius:16}, setting:{flexDirection:'row',alignItems:'center',paddingVertical:11,borderBottomWidth:1,borderColor:C.line,gap:12}, modalBack:{flex:1,backgroundColor:'rgba(5,9,16,.7)',justifyContent:'flex-end'}, sheet:{backgroundColor:'#223047',padding:22,paddingBottom:35,borderTopLeftRadius:26,borderTopRightRadius:26,gap:13}, handle:{width:40,height:4,backgroundColor:C.muted,borderRadius:4,alignSelf:'center',opacity:.5}, sheetTitle:{color:C.warm,fontSize:22,fontWeight:'900'}, sheetCopy:{color:C.muted,lineHeight:21,fontSize:14}, composeInput:{color:C.warm,minHeight:105,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,textAlignVertical:'top',fontSize:15}, toast:{position:'absolute',left:20,right:20,bottom:84,backgroundColor:'#263a44',padding:13,borderRadius:13,flexDirection:'row',alignItems:'center',gap:8,borderWidth:1,borderColor:'#478f72'}, toastText:{color:C.warm,fontSize:13,fontWeight:'700',flex:1},
