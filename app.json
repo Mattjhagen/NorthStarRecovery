@@ -34,6 +34,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.northstar.recovery",
+      "buildNumber": "30",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
