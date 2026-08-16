@@ -137,3 +137,16 @@ const UPLIFTS = [
   'Rest is part of recovery too.',
   'One more day. One more reason.',
 ];
+
+// Remote push: register this device's Expo token so the backend can reach it
+// (used for DM notifications). Best-effort; returns the token or null.
+export async function getRemotePushToken(projectId) {
+  try {
+    const granted = await requestNotificationPermissions();
+    if (!granted) return null;
+    const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
+    return data || null;
+  } catch {
+    return null;
+  }
+}

@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
-import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, cancelMeetingReminders, sendLocalNotification } from './notifications';
+import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, cancelMeetingReminders, sendLocalNotification, getRemotePushToken } from './notifications';
 import { READINGS } from './readings';
 import { createAccount, confirmAccount, signInWithPassword, restoreSignedInUser, signOutEverywhere } from './auth';
 import { apiRequest, isBackendConfigured } from './backend';
@@ -290,6 +290,13 @@ function AppInner() {
   }, [cmaLoaded]);
 
   useEffect(() => { fetchRecoveryNews().then(setRecoveryNews); }, []);
+
+  useEffect(() => {
+    if (authState !== 'authenticated' || !isBackendConfigured()) return;
+    getRemotePushToken('e2814d89-03ca-4798-a753-a56b695364f5').then(token => {
+      if (token) apiRequest('/v1/push-tokens',{method:'POST',body:JSON.stringify({token})}).catch(()=>{});
+    });
+  }, [authState]);
 
   const say = msg => { setToast(msg); setTimeout(()=>setToast(''), 2600); };
   const support = () => Alert.alert('Need support now?','This opens your phone app to contact urgent support. Northstar is not emergency care.',[{text:'Not now',style:'cancel'},{text:'Open phone',onPress:()=>Linking.openURL('tel:988')}]);
@@ -902,6 +909,15 @@ function BreathingGuide({ isPlaying }) {
 }
 
 // â"€â"€â"€ CONNECT â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+function timeAgo(iso) {
+  if (!iso) return '';
+  const mins = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1440) return `${Math.floor(mins/60)}h ago`;
+  return `${Math.floor(mins/1440)}d ago`;
+}
+
 function Connect({ say }) {
   const [posts, setPosts] = useState([]);
   const [blocked, setBlocked] = useState([]);
@@ -909,13 +925,91 @@ function Connect({ say }) {
   const [postSheet, setPostSheet] = useState(null);
   const [member, setMember] = useState(null);
   const [dm, setDm] = useState(null);
+  const [dmThread, setDmThread] = useState(null);
+  const [dmMessages, setDmMessages] = useState([]);
+  const [dmDraft, setDmDraft] = useState('');
   const [category, setCategory] = useState('Question');
   const [draft, setDraft] = useState('');
   const [comment, setComment] = useState('');
+  const online = isBackendConfigured();
+
+  const loadPosts = () => {
+    if (!online) return;
+    apiRequest('/v1/posts').then(data => {
+      if (!data?.posts) return;
+      setPosts(data.posts.map(p => ({
+        id:p.id, author:p.mine?'You':p.author, authorId:p.authorId, initial:(p.mine?'Y':p.author.charAt(0)).toUpperCase(),
+        category:p.category, time:timeAgo(p.createdAt), body:p.body, bio:p.bio||'', comments:[], commentCount:p.commentCount||0,
+      })));
+    }).catch(()=>{});
+  };
+  useEffect(loadPosts, []);
+
+  const openPost = post => {
+    setPostSheet(post);
+    if (!online || String(post.id).startsWith('local-')) return;
+    apiRequest(`/v1/posts/${post.id}/comments`).then(data => {
+      if (!data?.comments) return;
+      const comments = data.comments.map(c => ({ id:c.id, author:c.author, authorId:c.authorId, bio:c.bio||'', body:c.body }));
+      setPosts(p=>p.map(x=>x.id===post.id?{...x,comments}:x));
+      setPostSheet(x=>x&&x.id===post.id?{...x,comments}:x);
+    }).catch(()=>{});
+  };
+
   const visiblePosts = posts.filter(p=>!blocked.includes(p.author));
-  const blockMember = author=>Alert.alert(`Block ${author}?`,'Their posts and comments will be hidden.',[{text:'Cancel',style:'cancel'},{text:'Block member',style:'destructive',onPress:()=>{setBlocked(b=>[...b,author]);setMember(null);setPostSheet(null);say(`${author} is now hidden.`);}}]);
-  const publish=()=>{ if(!draft.trim()) return say('Write a little before sharing.'); setPosts(p=>[{id:`local-${Date.now()}`,author:'You',initial:'Y',category:category.toUpperCase(),time:'Just now',body:draft.trim(),bio:'',comments:[]},...p]); setDraft(''); setCompose(false); say('Shared with the circle.'); };
-  const addComment=()=>{ if(!comment.trim()||!postSheet) return; const c={id:`local-${Date.now()}`,author:'You',body:comment.trim()}; setPosts(p=>p.map(x=>x.id===postSheet.id?{...x,comments:[...x.comments,c]}:x)); setPostSheet(x=>({...x,comments:[...x.comments,c]})); setComment(''); say('Comment added.'); };
+  const blockMember = target=>Alert.alert(`Block ${target.author}?`,'Their posts and comments will be hidden.',[{text:'Cancel',style:'cancel'},{text:'Block member',style:'destructive',onPress:()=>{
+    setBlocked(b=>[...b,target.author]);setMember(null);setPostSheet(null);say(`${target.author} is now hidden.`);
+    if (online && target.authorId) apiRequest('/v1/blocks',{method:'POST',body:JSON.stringify({memberId:target.authorId})}).catch(()=>{});
+  }}]);
+  const reportPost = post=>Alert.alert('Report this post?','Our moderators will review it. Thank you for keeping the circle safe.',[{text:'Cancel',style:'cancel'},{text:'Report',style:'destructive',onPress:()=>{
+    say('Report received. Thank you.');
+    if (online && !String(post.id).startsWith('local-')) apiRequest('/v1/moderation/reports',{method:'POST',body:JSON.stringify({targetType:'post',targetId:String(post.id),reason:'member_report'})}).catch(()=>{});
+  }}]);
+  const publish=()=>{
+    if(!draft.trim()) return say('Write a little before sharing.');
+    const text=draft.trim(); setDraft(''); setCompose(false);
+    if (online) {
+      apiRequest('/v1/posts',{method:'POST',body:JSON.stringify({category:category.toUpperCase(),body:text})})
+        .then(data=>{ const p=data.post; setPosts(prev=>[{id:p.id,author:'You',authorId:p.authorId,initial:'Y',category:p.category,time:'Just now',body:p.body,bio:p.bio||'',comments:[],commentCount:0},...prev]); say('Shared with the circle.'); })
+        .catch(()=>{ say('Could not reach the circle. Try again soon.'); });
+    } else {
+      setPosts(p=>[{id:`local-${Date.now()}`,author:'You',initial:'Y',category:category.toUpperCase(),time:'Just now',body:text,bio:'',comments:[],commentCount:0},...p]);
+      say('Shared with the circle.');
+    }
+  };
+  const addComment=()=>{
+    if(!comment.trim()||!postSheet) return;
+    const text=comment.trim(); setComment('');
+    const applyLocal=c=>{ setPosts(p=>p.map(x=>x.id===postSheet.id?{...x,comments:[...x.comments,c],commentCount:(x.commentCount||0)+1}:x)); setPostSheet(x=>({...x,comments:[...x.comments,c]})); };
+    if (online && !String(postSheet.id).startsWith('local-')) {
+      apiRequest(`/v1/posts/${postSheet.id}/comments`,{method:'POST',body:JSON.stringify({body:text})})
+        .then(data=>{ applyLocal({id:data.comment.id,author:'You',authorId:data.comment.authorId,body:data.comment.body}); say('Comment added.'); })
+        .catch(()=>say('Could not add the comment. Try again soon.'));
+    } else { applyLocal({id:`local-${Date.now()}`,author:'You',body:text}); say('Comment added.'); }
+  };
+
+  const openDm = target => {
+    setMember(null); setDm(target); setDmMessages([]); setDmThread(null);
+    if (!online || !target.authorId) return;
+    apiRequest('/v1/dms',{method:'POST',body:JSON.stringify({peerId:target.authorId})})
+      .then(data=>setDmThread(data.thread.threadId))
+      .catch(()=>say('Messaging is unavailable right now.'));
+  };
+  useEffect(() => {
+    if (!dmThread) return;
+    let live = true;
+    const pull = () => apiRequest(`/v1/dms/${dmThread}/messages`).then(data=>{ if(live&&data?.messages) setDmMessages(data.messages); }).catch(()=>{});
+    pull();
+    const timer = setInterval(pull, 5000);
+    return () => { live = false; clearInterval(timer); };
+  }, [dmThread]);
+  const sendDm = () => {
+    if (!dmDraft.trim() || !dmThread) return;
+    const text = dmDraft.trim(); setDmDraft('');
+    apiRequest(`/v1/dms/${dmThread}/messages`,{method:'POST',body:JSON.stringify({body:text})})
+      .then(data=>setDmMessages(m=>[...m,data.message]))
+      .catch(()=>say('Message not sent. Try again.'));
+  };
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <Text style={styles.eyebrow}>PRIVATE COMMUNITY</Text><Text style={styles.h1}>The circle</Text>
@@ -926,8 +1020,8 @@ function Connect({ say }) {
         <Card key={post.id} style={styles.boardPost}>
           <View style={styles.rowBetween}><Text style={styles.topic}>{post.category}</Text><Text style={styles.postTime}>{post.time}</Text></View>
           <View style={styles.postHead}><Pressable onPress={()=>setMember(post)} style={styles.avatar}><Text style={styles.avatarText}>{post.initial}</Text></Pressable><Pressable onPress={()=>setMember(post)}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.tapHint}>Tap to view profile</Text></Pressable></View>
-          <Pressable onPress={()=>setPostSheet(post)}><Text style={styles.postText}>{post.body}</Text></Pressable>
-          <Pressable onPress={()=>setPostSheet(post)} style={styles.commentAction}><Icon name="chatbubble-ellipses-outline" color={C.mint}/><Text style={styles.commentActionText}>{post.comments.length} {post.comments.length===1?'comment':'comments'} Â· join gently</Text><Icon name="chevron-forward" size={15} color={C.muted}/></Pressable>
+          <Pressable onPress={()=>openPost(post)}><Text style={styles.postText}>{post.body}</Text></Pressable>
+          <Pressable onPress={()=>openPost(post)} style={styles.commentAction}><Icon name="chatbubble-ellipses-outline" color={C.mint}/><Text style={styles.commentActionText}>{Math.max(post.commentCount||0,post.comments.length)} {Math.max(post.commentCount||0,post.comments.length)===1?'comment':'comments'} Â· join gently</Text><Icon name="chevron-forward" size={15} color={C.muted}/></Pressable>
         </Card>
       ))}
       {visiblePosts.length===0&&<View style={styles.boardEmpty}><Icon name="shield-outline" size={31} color={C.mint}/><Text style={styles.cardTitle}>Your circle is quiet.</Text></View>}
@@ -960,6 +1054,7 @@ function Connect({ say }) {
               <View style={styles.threadComposer}>
                 <TextInput value={comment} onChangeText={setComment} placeholder="Offer a kind response…" placeholderTextColor={C.muted} style={styles.commentInput}/>
                 <Button label="Add comment" onPress={addComment} icon="chatbubble-outline"/>
+                <Pressable style={styles.dangerAction} onPress={()=>reportPost(postSheet)}><Icon name="flag-outline" color={C.gold}/><Text style={styles.dangerText}>Report post</Text></Pressable>
               </View>
             </>}
           </Pressable>
@@ -971,8 +1066,8 @@ function Connect({ say }) {
             {member&&<><View style={styles.handle}/>
               <View style={styles.memberHero}><View style={styles.memberAvatar}><Text style={styles.bigAvatarText}>{member.initial}</Text></View><View style={{flex:1}}><Text style={styles.sheetTitle}>{member.author}</Text><Text style={styles.muted}>Member profile</Text></View></View>
               <Text style={styles.sheetCopy}>{member.bio||'No bio.'}</Text>
-              <Button label="Message privately" onPress={()=>{setMember(null);setDm(member);}} icon="chatbubble-outline"/>
-              <Pressable style={styles.dangerAction} onPress={()=>blockMember(member.author)}><Icon name="eye-off-outline" color={C.gold}/><Text style={styles.dangerText}>Block member</Text></Pressable>
+              <Button label="Message privately" onPress={()=>openDm(member)} icon="chatbubble-outline"/>
+              <Pressable style={styles.dangerAction} onPress={()=>blockMember(member)}><Icon name="eye-off-outline" color={C.gold}/><Text style={styles.dangerText}>Block member</Text></Pressable>
             </>}
           </Pressable>
         </Pressable>
@@ -980,7 +1075,24 @@ function Connect({ say }) {
       <Modal visible={!!dm} transparent animationType="slide">
         <Pressable style={styles.modalBack} onPress={()=>setDm(null)}>
           <Pressable style={styles.sheet} onPress={()=>{}}>
-            {dm&&<><View style={styles.handle}/><Text style={styles.mini}>DIRECT MESSAGE</Text><Text style={styles.sheetTitle}>Message {dm.author}</Text><Text style={styles.sheetCopy}>Private messaging will be available once the community service is connected.</Text><Button label="Close" onPress={()=>setDm(null)} icon="close" kind="dark"/></>}
+            {dm&&<><View style={styles.handle}/><Text style={styles.mini}>DIRECT MESSAGE</Text><Text style={styles.sheetTitle}>Message {dm.author}</Text>
+              {!online&&<Text style={styles.sheetCopy}>Messaging needs a connection. Try again when you're back online.</Text>}
+              {online&&!dm.authorId&&<Text style={styles.sheetCopy}>This member can't receive messages yet.</Text>}
+              {online&&dm.authorId&&<>
+                <ScrollView style={styles.threadScroll} contentContainerStyle={styles.threadContent} showsVerticalScrollIndicator={false}>
+                  {dmMessages.length===0&&<Text style={styles.sheetCopy}>Say hello — messages are private between the two of you. Be kind; you can block or report anytime.</Text>}
+                  {dmMessages.map(m=>(
+                    <View key={m.id} style={[styles.comment,m.mine&&{backgroundColor:'#1d4038',alignSelf:'flex-end',maxWidth:'85%'},!m.mine&&{alignSelf:'flex-start',maxWidth:'85%'}]}>
+                      <Text style={styles.commentName}>{m.mine?'You':dm.author}</Text><Text style={styles.muted}>{m.body}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+                <View style={styles.threadComposer}>
+                  <TextInput value={dmDraft} onChangeText={setDmDraft} placeholder="Write something kind…" placeholderTextColor={C.muted} style={styles.commentInput}/>
+                  <Button label="Send" onPress={sendDm} icon="paper-plane"/>
+                </View>
+              </>}
+              <Button label="Close" onPress={()=>setDm(null)} icon="close" kind="dark"/></>}
           </Pressable>
         </Pressable>
       </Modal>
@@ -1272,7 +1384,14 @@ function ReadingPlayer({ reading, onClose }) {
           <Icon name="document-text-outline" color={C.gold}/>
           <Text style={styles.readingActionText}>Open PDF</Text>
         </Pressable>
-        <Pressable onPress={()=>Alert.alert('Share with room','Host controls for sharing readings in a live meeting will be available once the video calling feature is connected.')} style={styles.readingAction}>
+        <Pressable onPress={()=>{
+          const roomUrl=`https://meet.jit.si/northstar-reading-${Math.random().toString(36).slice(2,8)}`;
+          Alert.alert('Play for your room',`A private video room is ready. Share the link, join, then press play here — the reading ("${reading.title}") plays from your device while the room listens.`,[
+            {text:'Cancel',style:'cancel'},
+            {text:'Share link',onPress:()=>Share.share({message:`Join me for a CMA reading (${reading.title}): ${roomUrl}`})},
+            {text:'Share & join',onPress:()=>{Share.share({message:`Join me for a CMA reading (${reading.title}): ${roomUrl}`});Linking.openURL(roomUrl);}},
+          ]);
+        }} style={styles.readingAction}>
           <Icon name="people-outline" color={C.blue}/>
           <Text style={styles.readingActionText}>Play for room</Text>
         </Pressable>

@@ -45,6 +45,7 @@ eas build --platform all --profile production
 ### Learn tab
 - 9 progressive learning modules with XP tracking (unlock in sequence)
 - CMA Readings library — audio player (play / pause / seek / ±15s skip) + PDF link per pamphlet; narrated by Jessica
+- Play for room — spins up a private Jit.si room and shares the link so a host can play a reading live
 - NIDA RSS news feed (live, up to 6 articles)
 
 ### Calm tab
@@ -55,10 +56,10 @@ eas build --platform all --profile production
 - Plays in background and through iOS silent mode
 
 ### Connect tab
-- Local community circle — post Questions, Stories, or Check-ins
-- Comment threads on any post
-- Member profile sheet — view bio, block member
-- DM sheet (UI present, backend not connected)
+- Community circle backed by the member API — post Questions, Stories, or Check-ins (local-only fallback offline)
+- Comment threads on any post, with server-side comment counts
+- Member profile sheet — view bio, block member (blocks enforced server-side), report posts to moderation
+- Private DMs backed by the member API — 5s polling, push notification to the recipient
 
 ### Journal tab
 - Private entries with mood selector (Heavy / Tender / Steady / Hopeful)
@@ -70,6 +71,7 @@ eas build --platform all --profile production
 - Trusted person status indicator
 - Notification toggles: meeting reminders, daily inspiration (9 AM), evening check-in (8 PM), circle alerts
 - Demo notification fires in 8 seconds (physical device required)
+- Remote push: device registers its Expo push token so DMs notify the recipient
 - Anonymous / privacy mode toggle
 - Invite a friend via native Share sheet
 - Venmo donation card ($2 / $5 / $10) — deep links to `@rooteddaily`, falls back to venmo.com
@@ -82,11 +84,8 @@ eas build --platform all --profile production
 
 | Item | Notes |
 |---|---|
-| Connect DM backend | UI is complete; needs a real-time messaging service wired to the API |
-| Connect community feed backend | Posts and comments are currently local only |
-| Journal & profile sync | Works when `EXPO_PUBLIC_API_URL` env var is set; needs AWS stack deployed |
-| Push notifications | `notifications.js` schedules local notifications; remote push needs Expo credentials + backend endpoint |
-| "Play for room" in readings | Button shows a placeholder alert; needs Jit.si / video integration |
+| Deploy extended stack | `aws/member-api-production.yaml` now includes community + DM tables and routes; run `aws cloudformation package` + `deploy` (Lambda code lives in `aws/lambda/member_api/`) |
+| Moderation review loop | Reports land in the community table under `pk=REPORT`; needs an admin surface or scheduled digest |
 | GitHub Pages source | Repo Settings → Pages → set source to `gh-pages` branch so `cmameet.site` serves the React landing page |
 | App Store submission | Submit the next successful iOS EAS build via `eas submit --platform ios` — needs Apple numeric app ID |
 | Play Store submission | Submit Android build via `eas submit --platform android` |

@@ -42,6 +42,50 @@ Resources:
         SSEEnabled: true
       TableName: northstar-recovery-production-journal
 
+  CommunityContent:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      TableName: northstar-recovery-production-community
+
+  DirectMessages:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      TableName: northstar-recovery-production-dms
+
   MemberUserPool:
     Type: AWS::Cognito::UserPool
     DeletionPolicy: Retain
@@ -116,6 +160,12 @@ Resources:
                 Action: [dynamodb:PutItem, dynamodb:Query]
                 Resource: !GetAtt JournalEntries.Arn
               - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:Query, dynamodb:UpdateItem]
+                Resource: !GetAtt CommunityContent.Arn
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:Query, dynamodb:UpdateItem]
+                Resource: !GetAtt DirectMessages.Arn
+              - Effect: Allow
                 Action: cognito-idp:AdminDeleteUser
                 Resource: !GetAtt MemberUserPool.Arn
               - Effect: Allow
@@ -135,91 +185,10 @@ Resources:
         Variables:
           PROFILES_TABLE: !Ref MemberProfiles
           JOURNAL_TABLE: !Ref JournalEntries
+          COMMUNITY_TABLE: !Ref CommunityContent
+          DMS_TABLE: !Ref DirectMessages
           USER_POOL_ID: !Ref MemberUserPool
-      Code:
-        ZipFile: |
-          import json
-          import os
-          import boto3
-          from boto3.dynamodb.conditions import Key
-
-          table = boto3.resource('dynamodb').Table(os.environ['PROFILES_TABLE'])
-          journal = boto3.resource('dynamodb').Table(os.environ['JOURNAL_TABLE'])
-          cognito = boto3.client('cognito-idp')
-
-          def reply(status, body=None):
-              return {
-                  'statusCode': status,
-                  'headers': {'content-type': 'application/json', 'cache-control': 'no-store'},
-                  'body': '' if body is None else json.dumps(body),
-              }
-
-          def handler(event, context):
-              path = event['requestContext']['http']['path']
-              method = event['requestContext']['http']['method']
-              if path == '/v1/health':
-                  return reply(200, {'status': 'ok'})
-
-              claims = event['requestContext']['authorizer']['jwt']['claims']
-              member_id = claims['sub']
-              if path == '/v1/journal':
-                  if method == 'GET':
-                      entries = journal.query(
-                          KeyConditionExpression=Key('memberId').eq(member_id),
-                          ScanIndexForward=False,
-                          Limit=50,
-                      ).get('Items', [])
-                      return reply(200, {'entries': entries})
-                  if method == 'POST':
-                      try:
-                          body = json.loads(event.get('body') or '{}')
-                          text = body['text'].strip()
-                          mood = body.get('mood', 'steady')
-                          created_at = body['createdAt']
-                          if not (1 <= len(text) <= 5000 and mood in ['heavy', 'tender', 'steady', 'hopeful'] and len(created_at) <= 40):
-                              raise ValueError()
-                      except (ValueError, TypeError, KeyError, json.JSONDecodeError):
-                          return reply(400, {'error': 'invalid_journal_entry'})
-                      entry = {'memberId': member_id, 'createdAt': created_at, 'text': text, 'mood': mood}
-                      journal.put_item(Item=entry)
-                      return reply(201, {'entry': entry})
-                  return reply(405, {'error': 'method_not_allowed'})
-
-              if path != '/v1/me':
-                  return reply(404, {'error': 'not_found'})
-
-              if method == 'GET':
-                  item = table.get_item(Key={'memberId': member_id}).get('Item')
-                  return reply(200, {'profile': item or {'memberId': member_id, 'preferences': {}}})
-
-              if method == 'PUT':
-                  try:
-                      body = json.loads(event.get('body') or '{}')
-                      profile = body['profile']
-                      allowed = {'pseudonym', 'bio', 'dateOfBirth', 'gender', 'groupPreference', 'sobrietyDate'}
-                      if not isinstance(profile, dict) or any(key not in allowed for key in profile):
-                          raise ValueError()
-                      if len(profile.get('pseudonym', '')) > 40 or len(profile.get('bio', '')) > 280:
-                          raise ValueError()
-                      if profile.get('gender') not in [None, 'woman', 'man', 'nonbinary', 'self-describe', 'prefer-not-to-say']:
-                          raise ValueError()
-                      if profile.get('groupPreference') not in [None, 'women', 'men', 'all']:
-                          raise ValueError()
-                  except (ValueError, TypeError, KeyError, json.JSONDecodeError):
-                      return reply(400, {'error': 'invalid_profile'})
-                  existing = table.get_item(Key={'memberId': member_id}).get('Item', {'memberId': member_id})
-                  existing.update(profile)
-                  table.put_item(Item=existing)
-                  return reply(200, {'profile': existing})
-
-              if method == 'DELETE':
-                  table.delete_item(Key={'memberId': member_id})
-                  username = claims.get('cognito:username')
-                  if not username:
-                      return reply(409, {'error': 'account_deletion_unavailable'})
-                  cognito.admin_delete_user(UserPoolId=os.environ['USER_POOL_ID'], Username=username)
-                  return reply(204)
-              return reply(405, {'error': 'method_not_allowed'})
+      Code: ./lambda/member_api
 
   MemberApi:
     Type: AWS::ApiGatewayV2::Api
@@ -295,6 +264,105 @@ Resources:
     Properties:
       ApiId: !Ref MemberApi
       RouteKey: POST /v1/journal
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  PostsListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: GET /v1/posts
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  PostsCreateRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: POST /v1/posts
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  CommentsListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: GET /v1/posts/{postId}/comments
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  CommentsCreateRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: POST /v1/posts/{postId}/comments
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  DmThreadsListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: GET /v1/dms
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  DmThreadsCreateRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: POST /v1/dms
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  DmMessagesListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: GET /v1/dms/{threadId}/messages
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  DmMessagesCreateRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: POST /v1/dms/{threadId}/messages
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  PushTokenRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: POST /v1/push-tokens
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  BlocksRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: POST /v1/blocks
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  ReportsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: POST /v1/moderation/reports
       AuthorizationType: JWT
       AuthorizerId: !Ref MemberApiAuthorizer
       Target: !Sub integrations/${MemberApiIntegration}
