@@ -15,6 +15,7 @@ import { apiRequest, isBackendConfigured } from './backend';
 
 const C = { ink:'#101827', surface:'#192438', raised:'#233149', mint:'#5DE0A6', blue:'#75B8FF', warm:'#F4F1E8', muted:'#9DADC5', gold:'#F5B95D', line:'#34445d' };
 const CF = process.env.EXPO_PUBLIC_CLOUDFRONT_SOUNDSCAPES || 'https://d10rkhd3bzdolj.cloudfront.net/soundscapes/';
+const BRAND_ART = 'https://d10rkhd3bzdolj.cloudfront.net/branding/icon.png';
 
 const SOUNDSCAPES = [
   { name:'Binaural Breath & Echoes', category:'Ambient', icon:'headset-outline' },
@@ -876,6 +877,16 @@ function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
     if (status.didJustFinish) { try { player.seekTo(0); player.play(); } catch {} }
   },[status.didJustFinish, player]);
 
+  // Control Center / lock screen media card.
+  useEffect(()=>{
+    if (!isPlaying) return;
+    try {
+      player.setActiveForLockScreen(true,
+        { title: soundscape.name, artist: 'Northstar Recovery · Calm', albumTitle: soundscape.category, artworkUrl: BRAND_ART },
+        { showSeekForward: false, showSeekBackward: false });
+    } catch {}
+  },[isPlaying, soundscape, player]);
+
   const infinite = minutes==='∞';
   useEffect(()=>{ setRemaining(infinite?Infinity:minutes*60); },[minutes,infinite]);
   useEffect(()=>{
@@ -1508,6 +1519,13 @@ function ReadingPlayer({ reading, onClose }) {
   // Switching readings releases the old native player before this cleanup
   // runs; pausing a released player throws NativeSharedObjectNotFoundException.
   useEffect(()=>{ return ()=>{ try { player.pause(); } catch {} }; },[player]);
+  useEffect(()=>{
+    if (!status.playing) return;
+    try {
+      player.setActiveForLockScreen(true,
+        { title: reading.title, artist: 'CMA Readings · narrated by Jessica', albumTitle: 'Northstar Recovery', artworkUrl: BRAND_ART });
+    } catch {}
+  },[status.playing, reading, player]);
   const toggle = ()=>{ if(status.playing) player.pause(); else player.play(); };
   const seek = frac => player.seekTo(frac * status.duration);
   return (
