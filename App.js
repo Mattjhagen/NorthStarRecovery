@@ -54,17 +54,17 @@ const LEARN_MODULES = [
   { id:2, title:'Your first meeting', xp:120, icon:'people-outline',
     copy:'Know what to expect before you walk in or join.',
     steps:['Choose a format','Arrive your way','Reflect after'],
-    detail:"Meetings can feel intimidating. This module takes away the mystery so you can show up in whatever way feels safe â€" whether that's camera off, muted, or just listening.",
+    detail:"Meetings can feel intimidating. This module takes away the mystery so you can show up in whatever way feels safe — whether that's camera off, muted, or just listening.",
   },
   { id:3, title:'Managing cravings', xp:140, icon:'pulse-outline',
     copy:'Understand your cravings and learn to move through them.',
     steps:['Name the trigger','Ride the wave (urge surfing)','Use HALT to check in'],
-    detail:"Cravings are temporary â€" even when they don't feel that way. The HALT check (Hungry, Angry, Lonely, Tired) is one of the most practical tools in early recovery.",
+    detail:"Cravings are temporary — even when they don't feel that way. The HALT check (Hungry, Angry, Lonely, Tired) is one of the most practical tools in early recovery.",
   },
   { id:4, title:'Stress & anxiety', xp:160, icon:'leaf-outline',
     copy:'Simple tools for when everything feels like too much.',
     steps:['5-4-3-2-1 grounding','Box breathing','Name what\'s real vs. what\'s fear'],
-    detail:"Stress is normal. Anxiety in early recovery is extremely common. This module gives you grounding techniques that work in real moments â€" at home, at work, anywhere.",
+    detail:"Stress is normal. Anxiety in early recovery is extremely common. This module gives you grounding techniques that work in real moments — at home, at work, anywhere.",
   },
   { id:5, title:'Rebuilding your sleep', xp:160, icon:'moon-outline',
     copy:'Recovery and rest are deeply connected.',
@@ -84,12 +84,12 @@ const LEARN_MODULES = [
   { id:8, title:'Service & purpose', xp:220, icon:'heart-outline',
     copy:'Giving back is part of getting better.',
     steps:['What service means in Step 12','Find your way to give','One small act this week'],
-    detail:"Step 12 is about carrying the message. This module explores what service looks like in daily life â€" and why helping others is one of the most powerful tools for your own recovery.",
+    detail:"Step 12 is about carrying the message. This module explores what service looks like in daily life — and why helping others is one of the most powerful tools for your own recovery.",
   },
   { id:9, title:'Relapse prevention', xp:240, icon:'shield-outline',
     copy:'Preparation and self-compassion, together.',
     steps:['Know your warning signs','Make your plan','If it happens: next right step'],
-    detail:"Relapse is not failure â€" it\'s data. This module helps you identify your early warning signs and build a compassionate, practical response plan before you need it.",
+    detail:"Relapse is not failure — it\'s data. This module helps you identify your early warning signs and build a compassionate, practical response plan before you need it.",
   },
 ];
 
@@ -353,7 +353,7 @@ export default function App() {
 const SPLASH_MESSAGES = [
   'You are not alone in this.','Every step forward counts, no matter how small.',
   "Courage doesn't always roar. Sometimes it shows up quietly.",'Today is a new beginning.',
-  'Your story is still being written.',"Healing is not linear â€" and that's okay.",
+  'Your story is still being written.',"Healing is not linear — and that's okay.",
   'You deserve a life you want to live.','One day at a time is enough.',
   'There is room for you here.','Recovery is possible. You are proof.',
 ];
@@ -412,7 +412,7 @@ function ProfileEditor({ profile, onSave, onCancel }) {
       <ScrollView contentContainerStyle={styles.onboardScroll}>
         <View style={styles.rowBetween}><Pressable onPress={onCancel}><Icon name="close" color={C.warm}/></Pressable><Text style={styles.onboardKicker}>PROFILE & PRIVACY</Text></View>
         <Text style={styles.onboardTitle}>Only what feels right.</Text>
-        <Text style={styles.onboardCopy}>Your pseudonym is what others may see â€" not your legal name. Recovery details stay private.</Text>
+        <Text style={styles.onboardCopy}>Your pseudonym is what others may see — not your legal name. Recovery details stay private.</Text>
         <Pressable onPress={pickPhoto} style={styles.photoRow}>
           <Avatar photo={draft.photo} initial={(draft.pseudonym||'?').charAt(0).toUpperCase()} size={72} radius={22}/>
           <View style={{flex:1}}><Text style={styles.cardTitle}>Profile photo</Text><Text style={styles.muted}>Optional Â· tap to choose from your library</Text></View>
@@ -475,7 +475,7 @@ function Onboarding({ onComplete }) {
   if (mode==='welcome') return (
     <SafeAreaView style={styles.onboardSafe}><StatusBar style="light"/>
       <View style={styles.onboardStar}><Icon name="compass" size={40} color={C.mint}/></View>
-      <View style={styles.welcomeBody}><Text style={styles.brand}>NORTHSTAR</Text><Text style={styles.welcomeTitle}>A quiet place to find your way back.</Text><Text style={styles.welcomeCopy}>Support, reflection, and connection â€" at a pace that belongs to you.</Text></View>
+      <View style={styles.welcomeBody}><Text style={styles.brand}>NORTHSTAR</Text><Text style={styles.welcomeTitle}>A quiet place to find your way back.</Text><Text style={styles.welcomeCopy}>Support, reflection, and connection — at a pace that belongs to you.</Text></View>
       <View style={styles.welcomeBottom}><Button label="Create an account" onPress={()=>setMode('create')} icon="arrow-forward"/><Pressable onPress={()=>setMode('signin')} style={styles.textButton}><Text style={styles.textButtonLabel}>I already have an account</Text><Icon name="arrow-forward" size={16} color={C.mint}/></Pressable></View>
     </SafeAreaView>
   );
@@ -484,9 +484,9 @@ function Onboarding({ onComplete }) {
       <Pressable onPress={()=>setMode('welcome')}><Icon name="arrow-back" color={C.warm}/></Pressable>
       <Text style={styles.onboardKicker}>WELCOME BACK</Text><Text style={styles.onboardTitle}>Your space is here.</Text>
       <Field label="EMAIL" value={account.email} onChange={v=>setAccount(a=>({...a,email:v}))} placeholder="you@example.com"/>
-      <Field label="PASSWORD" value={account.password} onChange={v=>setAccount(a=>({...a,password:v}))} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" secure/>
+      <Field label="PASSWORD" value={account.password} onChange={v=>setAccount(a=>({...a,password:v}))} placeholder="••••••••" secure/>
       {message?<Text style={styles.statusNote}>{message}</Text>:null}
-      <Button label={busy?'Signing inâ€¦':'Sign in'} onPress={busy?undefined:handleSignIn} icon="log-in-outline"/>
+      <Button label={busy?'Signing in…':'Sign in'} onPress={busy?undefined:handleSignIn} icon="log-in-outline"/>
       <Pressable onPress={()=>setMode('create')} style={styles.textButton}><Text style={styles.textButtonLabel}>New here? Create an account</Text></Pressable>
     </ScrollView></SafeAreaView>
   );
@@ -496,7 +496,7 @@ function Onboarding({ onComplete }) {
       <Text style={styles.onboardCopy}>We sent a 6-digit code to {account.email}.</Text>
       <Field label="CONFIRMATION CODE" value={code} onChange={setCode} placeholder="123456"/>
       {message?<Text style={styles.statusNote}>{message}</Text>:null}
-      <Button label={busy?'Confirmingâ€¦':'Confirm account'} onPress={busy?undefined:handleConfirm} icon="checkmark-circle"/>
+      <Button label={busy?'Confirming…':'Confirm account'} onPress={busy?undefined:handleConfirm} icon="checkmark-circle"/>
     </ScrollView></SafeAreaView>
   );
   if (mode==='profile') return (
@@ -519,7 +519,7 @@ function Onboarding({ onComplete }) {
       <Field label="EMAIL" value={account.email} onChange={v=>setAccount(a=>({...a,email:v}))} placeholder="you@example.com"/>
       <Field label="PASSWORD" value={account.password} onChange={v=>setAccount(a=>({...a,password:v}))} placeholder="At least 8 characters" secure/>
       {message?<Text style={styles.statusNote}>{message}</Text>:null}
-      <Button label={busy?'Creating accountâ€¦':'Continue'} onPress={busy?undefined:handleSignUp} icon="arrow-forward"/>
+      <Button label={busy?'Creating account…':'Continue'} onPress={busy?undefined:handleSignUp} icon="arrow-forward"/>
       <Pressable onPress={()=>setMode('signin')} style={styles.textButton}><Text style={styles.textButtonLabel}>Already have an account? Sign in</Text></Pressable>
     </ScrollView></SafeAreaView>
   );
@@ -671,7 +671,7 @@ function Meetings({ say, profile, meetings, loading }) {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.segmentScroll}>
         {['All','Remote','In-person','Hybrid'].map(x=><Pressable key={x} onPress={()=>setFilter(x)} style={[styles.segment,filter===x&&styles.segmentActive]}><Text style={[styles.segmentText,filter===x&&styles.segmentTextActive]}>{x}</Text></Pressable>)}
       </ScrollView>
-      {loading&&<View style={{alignItems:'center',padding:20}}><ActivityIndicator color={C.mint}/><Text style={[styles.muted,{marginTop:8}]}>Loading CMA meetingsâ€¦</Text></View>}
+      {loading&&<View style={{alignItems:'center',padding:20}}><ActivityIndicator color={C.mint}/><Text style={[styles.muted,{marginTop:8}]}>Loading CMA meetings…</Text></View>}
       <Text style={styles.results}>{shown.length} meeting{shown.length!==1?'s':''} found</Text>
       {shown.map(m=>(
         <Card key={m.id} style={styles.meeting}>
@@ -737,8 +737,8 @@ function Learn({ say, onReadings, news }) {
             {isOpen&&<View style={styles.moduleDetail}>
               <Text style={styles.moduleCopy}>{m.copy}</Text>
               <Text style={[styles.muted,{lineHeight:20,marginBottom:4}]}>{m.detail}</Text>
-              {m.steps.map(s=><Text key={s} style={styles.step}>â€¢ {s}</Text>)}
-              <Button label={done?'Review module':'Complete module'} onPress={()=>{if(!done)setComplete(m.id);say(done?'Module opened for review':`${m.title} complete â€" ${m.xp} XP earned`);}} icon={done?'refresh':'checkmark'}/>
+              {m.steps.map(s=><Text key={s} style={styles.step}>• {s}</Text>)}
+              <Button label={done?'Review module':'Complete module'} onPress={()=>{if(!done)setComplete(m.id);say(done?'Module opened for review':`${m.title} complete — ${m.xp} XP earned`);}} icon={done?'refresh':'checkmark'}/>
             </View>}
           </Card>
         );
@@ -839,7 +839,7 @@ function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
   );
 }
 
-// Breathing guide â€" now the hero of the Calm screen, not a modal
+// Breathing guide — now the hero of the Calm screen, not a modal
 function BreathingGuide({ isPlaying }) {
   const pulse = useRef(new Animated.Value(.72)).current;
   const [phase, setPhase] = useState('Breathe in');
@@ -889,7 +889,7 @@ function Connect({ say }) {
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <Text style={styles.eyebrow}>PRIVATE COMMUNITY</Text><Text style={styles.h1}>The circle</Text>
-      <Text style={styles.intro}>Questions, stories, and small truths â€" held with care.</Text>
+      <Text style={styles.intro}>Questions, stories, and small truths — held with care.</Text>
       <View style={styles.standard}><Icon name="shield-checkmark" color={C.mint}/><Text style={styles.standardText}>No advice as authority. No pressure to share. If someone feels unsafe, block and report.</Text></View>
       <Pressable style={styles.compose} onPress={()=>setCompose(true)}><Icon name="create-outline" color={C.ink}/><Text style={styles.composeText}>Share with the circle</Text></Pressable>
       {visiblePosts.map(post=>(
@@ -908,7 +908,7 @@ function Connect({ say }) {
             <Text style={styles.sheetCopy}>If you may hurt yourself or someone else, call or text 988.</Text>
             <Text style={styles.fieldLabel}>WHAT ARE YOU SHARING?</Text>
             <View style={styles.choiceWrap}>{['Question','Story','Check-in'].map(x=><Choice key={x} label={x} active={category===x} onPress={()=>setCategory(x)}/>)}</View>
-            <TextInput multiline value={draft} onChangeText={setDraft} placeholder="Write what feels trueâ€¦" placeholderTextColor={C.muted} style={styles.composeInput}/>
+            <TextInput multiline value={draft} onChangeText={setDraft} placeholder="Write what feels true…" placeholderTextColor={C.muted} style={styles.composeInput}/>
             <Button label="Share" onPress={publish} icon="paper-plane"/>
           </Pressable>
         </Pressable>
@@ -928,7 +928,7 @@ function Connect({ say }) {
                 })}
               </ScrollView>
               <View style={styles.threadComposer}>
-                <TextInput value={comment} onChangeText={setComment} placeholder="Offer a kind responseâ€¦" placeholderTextColor={C.muted} style={styles.commentInput}/>
+                <TextInput value={comment} onChangeText={setComment} placeholder="Offer a kind response…" placeholderTextColor={C.muted} style={styles.commentInput}/>
                 <Button label="Add comment" onPress={addComment} icon="chatbubble-outline"/>
               </View>
             </>}
@@ -980,7 +980,7 @@ function Journal({ say, entries, onAdd }) {
           <Text style={styles.sheetCopy}>Entries are encrypted and belong only to you.</Text>
           <Text style={styles.fieldLabel}>HOW DOES THIS MOMENT FEEL?</Text>
           <View style={styles.moodRow}>{['Heavy','Tender','Steady','Hopeful'].map(x=><Choice key={x} label={x} active={mood===x} onPress={()=>setMood(x)}/>)}</View>
-          <TextInput value={body} onChangeText={setBody} multiline autoFocus placeholder="There is room for the honest versionâ€¦" placeholderTextColor={C.muted} style={styles.journalInput}/>
+          <TextInput value={body} onChangeText={setBody} multiline autoFocus placeholder="There is room for the honest version…" placeholderTextColor={C.muted} style={styles.journalInput}/>
           <Button label="Keep entry" onPress={save} icon="bookmark-outline"/>
         </View></View>
       </Modal>
@@ -1172,7 +1172,7 @@ function ReadingsLibrary({ onClose }) {
         <Pressable onPress={onClose} style={styles.iconBtn}><Icon name="close"/></Pressable>
       </View>
       <ScrollView contentContainerStyle={[styles.scroll,{paddingTop:8}]}>
-        <Text style={styles.intro}>Official CMA pamphlets â€" listen along or open the full PDF.</Text>
+        <Text style={styles.intro}>Official CMA pamphlets — listen along or open the full PDF.</Text>
         {READINGS.map(r=>(
           <Pressable key={r.id} onPress={()=>setSelected(r)} style={[styles.readingCard, selected?.id===r.id&&styles.readingCardActive]}>
             <View style={[styles.readingIcon,selected?.id===r.id&&{backgroundColor:C.ink}]}>
@@ -1180,7 +1180,7 @@ function ReadingsLibrary({ onClose }) {
             </View>
             <View style={{flex:1}}>
               <Text style={[styles.cardTitle,selected?.id===r.id&&{color:C.ink}]}>{r.title}</Text>
-              <Text style={[styles.muted,selected?.id===r.id&&{color:'#1a4a3a'}]}>{r.durationEst} Â· {r.description.slice(0,55)}â€¦</Text>
+              <Text style={[styles.muted,selected?.id===r.id&&{color:'#1a4a3a'}]}>{r.durationEst} Â· {r.description.slice(0,55)}…</Text>
             </View>
             <Icon name={selected?.id===r.id?'chevron-down':'chevron-forward'} size={16} color={selected?.id===r.id?C.ink:C.muted}/>
           </Pressable>
