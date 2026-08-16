@@ -166,6 +166,9 @@ Resources:
                 Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:Query, dynamodb:UpdateItem]
                 Resource: !GetAtt DirectMessages.Arn
               - Effect: Allow
+                Action: s3:PutObject
+                Resource: arn:aws:s3:::northstar-recovery-soundscapes-soundscapebucket-aoh06vis4c8n/avatars/*
+              - Effect: Allow
                 Action: cognito-idp:AdminDeleteUser
                 Resource: !GetAtt MemberUserPool.Arn
               - Effect: Allow
@@ -188,6 +191,8 @@ Resources:
           COMMUNITY_TABLE: !Ref CommunityContent
           DMS_TABLE: !Ref DirectMessages
           USER_POOL_ID: !Ref MemberUserPool
+          AVATAR_BUCKET: northstar-recovery-soundscapes-soundscapebucket-aoh06vis4c8n
+          AVATAR_BASE_URL: https://d10rkhd3bzdolj.cloudfront.net/
       Code: ./lambda/member_api
 
   MemberApi:
@@ -363,6 +368,15 @@ Resources:
     Properties:
       ApiId: !Ref MemberApi
       RouteKey: POST /v1/moderation/reports
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  AvatarUploadRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: POST /v1/me/avatar
       AuthorizationType: JWT
       AuthorizerId: !Ref MemberApiAuthorizer
       Target: !Sub integrations/${MemberApiIntegration}

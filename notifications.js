@@ -21,7 +21,7 @@ export async function scheduleDailyUplift(hour = 9, minute = 0) {
         body: UPLIFTS[Math.floor(Math.random() * UPLIFTS.length)],
         sound: true,
       },
-      trigger: { hour, minute, repeats: true },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute },
     });
     return { ok: true };
   } catch (e) {
@@ -45,7 +45,7 @@ export async function scheduleDailyCheckin(hour = 20, minute = 0) {
         body: 'Take a moment to check in with yourself. Your journal is waiting.',
         sound: true,
       },
-      trigger: { hour, minute, repeats: true },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute },
     });
     return { ok: true };
   } catch (e) {
@@ -69,7 +69,7 @@ export async function scheduleMeetingReminder(title, date, minutesBefore = 10) {
         body: `"${title}" begins in ${minutesBefore} minutes.`,
         sound: true,
       },
-      trigger: { date: fireDate },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireDate },
     });
     return { ok: true };
   } catch (e) {
@@ -96,7 +96,7 @@ export async function scheduleDemoInsight() {
         body: UPLIFTS[Math.floor(Math.random() * UPLIFTS.length)],
         sound: true,
       },
-      trigger: { seconds: 8 },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 8 },
     });
     return { ok: true };
   } catch (e) {
@@ -110,7 +110,7 @@ export async function sendLocalNotification(title, body) {
     if (!granted) return;
     await Notifications.scheduleNotificationAsync({
       content: { title, body, sound: true },
-      trigger: { seconds: 1 },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 1 },
     });
   } catch {}
 }

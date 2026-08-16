@@ -7,6 +7,7 @@ import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-au
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
+import * as QuickActions from 'expo-quick-actions';
 import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, cancelMeetingReminders, sendLocalNotification, getRemotePushToken } from './notifications';
 import { READINGS } from './readings';
 import { createAccount, confirmAccount, signInWithPassword, restoreSignedInUser, signOutEverywhere } from './auth';
@@ -279,7 +280,12 @@ function AppInner() {
 
   const calmPlayer = useAudioPlayer(soundscapeUri(currentSoundscape.name));
 
+  const [authEmail, setAuthEmail] = useState('');
   useEffect(() => { restoreSignedInUser().then(u => setAuthState(u ? 'authenticated' : 'onboarding')).catch(() => setAuthState('onboarding')); }, []);
+  useEffect(() => {
+    if (authState !== 'authenticated') return;
+    restoreSignedInUser().then(u => setAuthEmail(u?.signInDetails?.loginId || u?.username || '')).catch(()=>{});
+  }, [authState]);
   useEffect(() => { setAudioModeAsync({ playsInSilentMode:true, shouldPlayInBackground:true, interruptionMode:'duckOthers' }).catch(()=>{}); }, []);
   useEffect(() => { calmPlayer.loop = true; }, [calmPlayer]);
 
@@ -315,6 +321,30 @@ function AppInner() {
 
   useEffect(() => { fetchRecoveryNews().then(setRecoveryNews); }, []);
 
+  // Home-screen quick actions (long-press the app icon).
+  const quickCtx = useRef({ meetings, profile });
+  useEffect(() => { quickCtx.current = { meetings, profile }; }, [meetings, profile]);
+  useEffect(() => {
+    if (authState !== 'authenticated') return;
+    QuickActions.setItems([
+      { id:'meeting', title:'Join next meeting', icon:'symbol:video' },
+      { id:'sponsor', title:'Call sponsor', icon:'symbol:phone' },
+      { id:'circle', title:'Share with the circle', icon:'symbol:person.3' },
+      { id:'calm', title:'Open Calm', icon:'symbol:leaf' },
+    ]).catch(()=>{});
+    const act = action => {
+      const { meetings:mtgs, profile:prof } = quickCtx.current;
+      if (!action) return;
+      if (action.id==='sponsor') { prof.sponsor?.phone ? Linking.openURL(`tel:${prof.sponsor.phone.replace(/\D/g,'')}`) : setTab('You'); }
+      else if (action.id==='meeting') { const next=nextMeeting(mtgs); setTab('Meetings'); if(next) openWeb(next.url); }
+      else if (action.id==='circle') setTab('Connect');
+      else if (action.id==='calm') setTab('Calm');
+    };
+    if (QuickActions.initial) act(QuickActions.initial);
+    const sub = QuickActions.addListener(act);
+    return () => sub.remove();
+  }, [authState]);
+
   useEffect(() => {
     if (authState !== 'authenticated' || !isBackendConfigured()) return;
     getRemotePushToken('e2814d89-03ca-4798-a753-a56b695364f5').then(token => {
@@ -342,8 +372,11 @@ function AppInner() {
       await apiRequest('/v1/me',{method:'PUT',body:JSON.stringify({profile:{
         pseudonym:next.pseudonym||undefined, bio:next.bio||undefined, dateOfBirth:next.dob||undefined,
         gender:GENDER_TO_API[next.gender]||undefined, groupPreference:PREF_TO_API[next.groupPreference]||undefined,
-        sobrietyDate:next.sobrietyDate||undefined,
+        sobrietyDate:next.sobrietyDate||undefined, privacyMode:!!next.privacyMode,
       }})});
+      if (next.photoBase64) {
+        await apiRequest('/v1/me/avatar',{method:'POST',body:JSON.stringify({imageBase64:next.photoBase64})}).catch(()=>{});
+      }
     } catch { say('Profile saved locally. Sync will retry.'); }
   };
 
@@ -357,7 +390,8 @@ function AppInner() {
   if (authState === 'loading') return <SplashScreen/>;
   if (authState === 'onboarding') return <Onboarding onComplete={p=>{setProfile(p);setAuthState('authenticated');}}/>;
 
-  const sobrietyDays = profile.sobrietyDate ? Math.max(0, Math.floor((Date.now()-new Date(profile.sobrietyDate).getTime())/86400000)) : null;
+  const sobrietyMs = profile.sobrietyDate ? new Date(profile.sobrietyDate).getTime() : NaN;
+  const sobrietyDays = Number.isFinite(sobrietyMs) ? Math.max(0, Math.floor((Date.now()-sobrietyMs)/86400000)) : null;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -378,7 +412,7 @@ function AppInner() {
           <Calm player={calmPlayer} soundscape={currentSoundscape} soundscapes={SOUNDSCAPES} onSelectSoundscape={setCurrentSoundscape}/>
         </View>
         {tab==='Connect'  && <Connect say={say}/>}
-        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile}/>}
+        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={authEmail.toLowerCase()==='matty@purepulse.one'}/>}
         {tab==='Journal'  && <Journal say={say} entries={journalEntries} onAdd={addJournalEntry}/>}
       </View>
       <View style={styles.tabbar}>
@@ -465,8 +499,8 @@ function ProfileEditor({ profile, onSave, onCancel }) {
   const pickPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission needed','Allow photo access in Settings to set a profile photo.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes:['images'], allowsEditing:true, aspect:[1,1], quality:0.8 });
-    if (!result.canceled && result.assets?.[0]) setDraft(p=>({...p,photo:result.assets[0].uri}));
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes:['images'], allowsEditing:true, aspect:[1,1], quality:0.35, base64:true });
+    if (!result.canceled && result.assets?.[0]) setDraft(p=>({...p,photo:result.assets[0].uri,photoBase64:result.assets[0].base64||''}));
   };
   return (
     <SafeAreaView style={styles.onboardSafe}>
@@ -780,10 +814,10 @@ function Learn({ say, onReadings, news }) {
         <Icon name="sparkles" size={32} color={C.gold}/>
       </Card>
       {LEARN_MODULES.map((m,i)=>{
-        const locked=i+1>complete+1, done=i+1<=complete, isOpen=open===m.id;
+        const locked=i+1>complete+1, done=i+1<=complete, isOpen=open===m.id, completable=!locked&&!done;
         return (
           <Card key={m.id} style={[styles.module,locked&&{opacity:.56}]}>
-            <Pressable disabled={locked} onPress={()=>setOpen(isOpen?0:m.id)}>
+            <Pressable onPress={()=>setOpen(isOpen?0:m.id)}>
               <View style={styles.rowBetween}>
                 <View style={[styles.moduleDot,done&&{backgroundColor:C.mint}]}>
                   <Icon name={done?'checkmark':locked?'lock-closed':m.icon} size={16} color={done?C.ink:C.muted}/>
@@ -799,7 +833,9 @@ function Learn({ say, onReadings, news }) {
               <Text style={styles.moduleCopy}>{m.copy}</Text>
               <Text style={[styles.muted,{lineHeight:20,marginBottom:4}]}>{m.detail}</Text>
               {m.steps.map(s=><Text key={s} style={styles.step}>• {s}</Text>)}
-              <Button label={done?'Review module':'Complete module'} onPress={()=>{if(!done)setComplete(m.id);say(done?'Module opened for review':`${m.title} complete — ${m.xp} XP earned`);}} icon={done?'refresh':'checkmark'}/>
+              {locked
+                ? <Text style={[styles.muted,{fontStyle:'italic'}]}>Finish the earlier modules to complete this one — reading ahead is always okay.</Text>
+                : <Button label={done?'Review module':'Complete module'} onPress={()=>{if(!done)setComplete(m.id);say(done?'Module opened for review':`${m.title} complete — ${m.xp} XP earned`);}} icon={done?'refresh':'checkmark'}/>}
             </View>}
           </Card>
         );
@@ -829,7 +865,7 @@ function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
   const [minutes, setMinutes] = useState(10);
   const [remaining, setRemaining] = useState(10*60);
   const [visual, setVisual] = useState('Breath');
-  const [hapticCues, setHapticCues] = useState(false);
+  const [hapticLevel, setHapticLevel] = useState(1);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState('All');
   const isPlaying = status.playing;
@@ -840,21 +876,22 @@ function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
     if (status.didJustFinish) { try { player.seekTo(0); player.play(); } catch {} }
   },[status.didJustFinish, player]);
 
-  useEffect(()=>{ setRemaining(minutes*60); },[minutes]);
+  const infinite = minutes==='∞';
+  useEffect(()=>{ setRemaining(infinite?Infinity:minutes*60); },[minutes,infinite]);
   useEffect(()=>{
-    if (!isPlaying||remaining===0) return;
+    if (!isPlaying||infinite||remaining===0) return;
     const t=setInterval(()=>setRemaining(v=>v>0?v-1:0),1000);
     return ()=>clearInterval(t);
-  },[isPlaying,remaining]);
-  useEffect(()=>{ if(remaining===0&&isPlaying) player.pause(); },[remaining,isPlaying,player]);
+  },[isPlaying,remaining,infinite]);
+  useEffect(()=>{ if(!infinite&&remaining===0&&isPlaying) player.pause(); },[remaining,isPlaying,player,infinite]);
 
   const togglePlayback = ()=>{
     if (isPlaying) player.pause();
-    else { if(remaining===0) setRemaining(minutes*60); player.play(); }
+    else { if(!infinite&&remaining===0) setRemaining(minutes*60); player.play(); }
   };
   const setSession = v=>{ player.pause(); player.seekTo(0); setMinutes(v); };
-  const handleSelectSoundscape = s=>{ player.pause(); onSelectSoundscape(s); setPickerOpen(false); setRemaining(minutes*60); };
-  const display = `${String(Math.floor(remaining/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`;
+  const handleSelectSoundscape = s=>{ player.pause(); onSelectSoundscape(s); setPickerOpen(false); setRemaining(infinite?Infinity:minutes*60); };
+  const display = infinite ? '∞' : `${String(Math.floor(remaining/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`;
   const categories = ['All',...new Set(soundscapes.map(s=>s.category))];
   const filtered = filterCategory==='All'?soundscapes:soundscapes.filter(s=>s.category===filterCategory);
 
@@ -865,7 +902,7 @@ function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
       <Card style={styles.playerCard}>
         <Text style={styles.cardTitle}>{soundscape.name}</Text>
         <Text style={styles.muted}>{soundscape.category} · {isPlaying?'Playing':'Paused'}</Text>
-        <CalmVisual visual={visual} isPlaying={isPlaying} haptics={hapticCues}/>
+        <CalmVisual visual={visual} isPlaying={isPlaying} haptics={hapticLevel}/>
         <Text style={styles.timer}>{display}</Text>
         <Pressable onPress={togglePlayback} style={styles.playButton}>
           <Icon name={isPlaying?'pause':'play'} size={26} color={C.ink}/>
@@ -874,9 +911,9 @@ function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
       </Card>
       <Text style={styles.sectionTitle}>CHOOSE A VISUAL LOOP</Text>
       <View style={styles.visualRow}>{[['Breath','ellipse-outline'],['Night','moon-outline'],['Waves','water-outline']].map(([name,icon])=><Pressable key={name} onPress={()=>setVisual(name)} style={[styles.visualChoice,visual===name&&styles.visualChoiceActive]}><Icon name={icon} size={18} color={visual===name?C.ink:C.muted}/><Text style={[styles.visualText,visual===name&&styles.visualTextActive]}>{name}</Text></Pressable>)}</View>
-      {visual==='Breath'&&<Pressable onPress={()=>setHapticCues(v=>!v)} style={[styles.visualChoice,{marginTop:2},hapticCues&&styles.visualChoiceActive]}><Icon name="radio-outline" size={16} color={hapticCues?C.ink:C.muted}/><Text style={[styles.visualText,hapticCues&&styles.visualTextActive]}>Haptic breathing cues {hapticCues?'on':'off'}</Text></Pressable>}
+      {visual==='Breath'&&<View style={[styles.visualRow,{marginTop:2}]}>{[['Off',0],['Soft',1],['Strong',2]].map(([label,lvl])=><Pressable key={label} onPress={()=>setHapticLevel(lvl)} style={[styles.visualChoice,hapticLevel===lvl&&styles.visualChoiceActive]}><Icon name={lvl===0?'radio-outline':'radio'} size={15} color={hapticLevel===lvl?C.ink:C.muted}/><Text style={[styles.visualText,hapticLevel===lvl&&styles.visualTextActive]}>{label==='Off'?'Haptics off':`${label} haptics`}</Text></Pressable>)}</View>}
       <Text style={styles.sectionTitle}>CHOOSE YOUR SESSION</Text>
-      <View style={styles.sessionRow}>{[5,10,20].map(v=><Pressable key={v} onPress={()=>setSession(v)} style={[styles.session,minutes===v&&styles.sessionActive]}><Text style={[styles.sessionText,minutes===v&&styles.sessionTextActive]}>{v} min</Text></Pressable>)}</View>
+      <View style={styles.sessionRow}>{[5,10,20,'∞'].map(v=><Pressable key={v} onPress={()=>setSession(v)} style={[styles.session,minutes===v&&styles.sessionActive]}><Text style={[styles.sessionText,minutes===v&&styles.sessionTextActive]}>{v==='∞'?'∞':`${v} min`}</Text></Pressable>)}</View>
       <Pressable onPress={()=>setPickerOpen(true)} style={styles.soundscapePicker}>
         <Icon name="musical-notes-outline" color={C.mint}/>
         <Text style={styles.soundscapePickerText}>Choose soundscape ({soundscapes.length} available)</Text>
@@ -909,24 +946,42 @@ function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
 }
 
 // Breathing guide — now the hero of the Calm screen, not a modal
+// Watch-style continuous haptic pulses during inhale/exhale. level: 0 off, 1 soft, 2 strong.
+function useBreathHaptics(level) {
+  const timer = useRef(null);
+  const stop = useCallback(()=>{ if(timer.current){clearInterval(timer.current);timer.current=null;} },[]);
+  const pulse = useCallback((label,duration)=>{
+    stop();
+    if (!level) return;
+    const style = level===2?Haptics.ImpactFeedbackStyle.Heavy:Haptics.ImpactFeedbackStyle.Light;
+    const gap = level===2?160:320;
+    if (label==='Breathe in'||label==='Breathe out') {
+      Haptics.impactAsync(style).catch(()=>{});
+      timer.current = setInterval(()=>Haptics.impactAsync(style).catch(()=>{}), gap);
+      setTimeout(stop, duration-80);
+    } else {
+      Haptics.selectionAsync().catch(()=>{});
+    }
+  },[level,stop]);
+  useEffect(()=>stop,[stop]);
+  return { pulse, stop };
+}
+
 function BreathingGuide({ isPlaying, haptics }) {
   const pulse = useRef(new Animated.Value(.72)).current;
   const glow = useRef(new Animated.Value(0)).current;
   const [phase, setPhase] = useState('Breathe in');
   const anim = useRef(null);
+  const { pulse: hapticPulse, stop: hapticStop } = useBreathHaptics(haptics);
   useEffect(()=>{
-    if (!isPlaying) { anim.current?.stop(); setPhase('Ready'); return; }
+    if (!isPlaying) { anim.current?.stop(); hapticStop(); setPhase('Ready'); return; }
     const steps = [['Breathe in',1.18,4000],['Hold',1.18,2000],['Breathe out',.72,4000],['Hold',.72,2000]];
     let idx=0, active=true;
     const run=()=>{
       if (!active) return;
       const [label,scale,dur]=steps[idx];
       setPhase(label);
-      if (haptics) {
-        if (label==='Breathe in') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(()=>{});
-        else if (label==='Breathe out') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
-        else Haptics.selectionAsync().catch(()=>{});
-      }
+      hapticPulse(label,dur);
       anim.current = Animated.parallel([
         Animated.timing(pulse,{toValue:scale,duration:dur,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),
         Animated.timing(glow,{toValue:label==='Breathe in'||(label==='Hold'&&scale>1)?1:0,duration:dur,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),
@@ -934,8 +989,8 @@ function BreathingGuide({ isPlaying, haptics }) {
       anim.current.start(({finished})=>{ if(finished&&active){ idx=(idx+1)%steps.length; run(); } });
     };
     run();
-    return ()=>{ active=false; anim.current?.stop(); };
-  },[isPlaying,pulse,glow,haptics]);
+    return ()=>{ active=false; anim.current?.stop(); hapticStop(); };
+  },[isPlaying,pulse,glow,haptics,hapticPulse,hapticStop]);
   return (
     <View style={styles.breathGuide}>
       <Animated.View style={[styles.breathGlow,{opacity:glow,transform:[{scale:Animated.multiply(pulse,1.12)}]}]}/>
@@ -1043,7 +1098,7 @@ function Connect({ say }) {
       if (!data?.posts) return;
       setPosts(data.posts.map(p => ({
         id:p.id, author:p.mine?'You':p.author, authorId:p.authorId, initial:(p.mine?'Y':p.author.charAt(0)).toUpperCase(),
-        category:p.category, time:timeAgo(p.createdAt), body:p.body, bio:p.bio||'', comments:[], commentCount:p.commentCount||0,
+        avatar:p.avatar||'', category:p.category, time:timeAgo(p.createdAt), body:p.body, bio:p.bio||'', comments:[], commentCount:p.commentCount||0,
       })));
     }).catch(()=>{});
   };
@@ -1054,7 +1109,7 @@ function Connect({ say }) {
     if (!online || String(post.id).startsWith('local-')) return;
     apiRequest(`/v1/posts/${post.id}/comments`).then(data => {
       if (!data?.comments) return;
-      const comments = data.comments.map(c => ({ id:c.id, author:c.author, authorId:c.authorId, bio:c.bio||'', body:c.body }));
+      const comments = data.comments.map(c => ({ id:c.id, author:c.author, authorId:c.authorId, avatar:c.avatar||'', bio:c.bio||'', body:c.body }));
       setPosts(p=>p.map(x=>x.id===post.id?{...x,comments}:x));
       setPostSheet(x=>x&&x.id===post.id?{...x,comments}:x);
     }).catch(()=>{});
@@ -1123,7 +1178,7 @@ function Connect({ say }) {
       {visiblePosts.map(post=>(
         <Card key={post.id} style={styles.boardPost}>
           <View style={styles.rowBetween}><Text style={styles.topic}>{post.category}</Text><Text style={styles.postTime}>{post.time}</Text></View>
-          <View style={styles.postHead}><Pressable onPress={()=>setMember(post)} style={styles.avatar}><Text style={styles.avatarText}>{post.initial}</Text></Pressable><Pressable onPress={()=>setMember(post)}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.tapHint}>Tap to view profile</Text></Pressable></View>
+          <View style={styles.postHead}><Pressable onPress={()=>setMember(post)}>{post.avatar?<Image source={{uri:post.avatar}} style={styles.avatarImg}/>:<View style={styles.avatar}><Text style={styles.avatarText}>{post.initial}</Text></View>}</Pressable><Pressable onPress={()=>setMember(post)}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.tapHint}>Tap to view profile</Text></Pressable></View>
           <Pressable onPress={()=>openPost(post)}><Text style={styles.postText}>{post.body}</Text></Pressable>
           <Pressable onPress={()=>openPost(post)} style={styles.commentAction}><Icon name="chatbubble-ellipses-outline" color={C.mint}/><Text style={styles.commentActionText}>{Math.max(post.commentCount||0,post.comments.length)} {Math.max(post.commentCount||0,post.comments.length)===1?'comment':'comments'} · join gently</Text><Icon name="chevron-forward" size={15} color={C.muted}/></Pressable>
         </Card>
@@ -1168,7 +1223,7 @@ function Connect({ say }) {
         <Pressable style={styles.modalBack} onPress={()=>setMember(null)}>
           <Pressable style={styles.sheet} onPress={()=>{}}>
             {member&&<><View style={styles.handle}/>
-              <View style={styles.memberHero}><View style={styles.memberAvatar}><Text style={styles.bigAvatarText}>{member.initial}</Text></View><View style={{flex:1}}><Text style={styles.sheetTitle}>{member.author}</Text><Text style={styles.muted}>Member profile</Text></View></View>
+              <View style={styles.memberHero}>{member.avatar?<Image source={{uri:member.avatar}} style={styles.memberAvatarImg}/>:<View style={styles.memberAvatar}><Text style={styles.bigAvatarText}>{member.initial}</Text></View>}<View style={{flex:1}}><Text style={styles.sheetTitle}>{member.author}</Text><Text style={styles.muted}>Member profile</Text></View></View>
               <Text style={styles.sheetCopy}>{member.bio||'No bio.'}</Text>
               <Button label="Message privately" onPress={()=>openDm(member)} icon="chatbubble-outline"/>
               <Pressable style={styles.dangerAction} onPress={()=>blockMember(member)}><Icon name="eye-off-outline" color={C.gold}/><Text style={styles.dangerText}>Block member</Text></Pressable>
@@ -1263,7 +1318,7 @@ function SupportNorthstar({ say }) {
 }
 
 // ─── YOU ──────────────────────────────────────────────────────────────────────
-function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries, saveProfile }) {
+function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries, saveProfile, isAdmin }) {
   const [prefs, setPrefs] = useState({ meetings:true, insight:false, checkin:false, circleNotifs:true });
   const name = profile.pseudonym || 'Northstar member';
   const hasSponsor = profile.sponsor?.name;
@@ -1290,7 +1345,7 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
     say(val ? 'Anonymous mode on — your profile is hidden from community search.' : 'Anonymous mode off.');
   };
   const inviteFriend = () => Share.share({
-    message: "I'm using Northstar Recovery on my sobriety journey. It's gentle and private — join me.",
+    message: "I'm using Northstar Recovery on my sobriety journey. It's gentle and private — join me: https://cmameet.site",
     title: 'Northstar Recovery',
   });
 
@@ -1371,7 +1426,7 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
           <Switch value={val} onValueChange={toggle} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={val?C.mint:C.muted}/>
         </View>
       ))}
-      <Button label="Send a demo notification" onPress={async()=>{ const r=await scheduleDemoInsight(); say(r.ok?'Check in 8 seconds':r.reason); }} kind="dark" icon="notifications-outline"/>
+      {isAdmin&&<Button label="Send a demo notification" onPress={async()=>{ const r=await scheduleDemoInsight(); say(r.ok?'Check in 8 seconds':r.reason); }} kind="dark" icon="notifications-outline"/>}
 
       <Text style={styles.sectionTitle}>PRIVACY</Text>
       <View style={styles.setting}>
@@ -1509,7 +1564,7 @@ function ReadingPlayer({ reading, onClose }) {
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   standard:{flexDirection:'row',gap:9,padding:13,borderLeftWidth:2,borderColor:C.mint,backgroundColor:'#16343a'}, standardText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, boardPost:{gap:11}, topic:{color:C.mint,fontSize:10,fontWeight:'900',letterSpacing:1.2}, postTime:{color:C.muted,fontSize:11}, tapHint:{color:C.blue,fontSize:11,marginTop:1}, commentAction:{flexDirection:'row',alignItems:'center',gap:7,paddingTop:11,borderTopWidth:1,borderColor:C.line}, commentActionText:{color:C.mint,fontSize:12,fontWeight:'800',flex:1}, boardEmpty:{minHeight:180,justifyContent:'center',alignItems:'center',gap:10,padding:24,borderWidth:1,borderColor:C.line,borderRadius:17}, memberHero:{flexDirection:'row',alignItems:'center',gap:13}, memberAvatar:{height:57,width:57,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, profileSafety:{flexDirection:'row',gap:9,padding:12,backgroundColor:'#17363a',borderRadius:12}, profileSafetyText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, dangerAction:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, dangerText:{color:C.gold,fontWeight:'800',fontSize:14}, postSheet:{height:'88%',paddingBottom:20}, threadScroll:{flexGrow:0,flexShrink:1}, threadContent:{gap:12,paddingBottom:8}, threadComposer:{gap:8,paddingTop:10,borderTopWidth:1,borderColor:C.line}, comment:{padding:11,backgroundColor:C.raised,borderRadius:11,gap:3}, commentName:{color:C.warm,fontWeight:'800',fontSize:13}, commentInput:{color:C.warm,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,minHeight:52,fontSize:14},
-  safe:{flex:1,backgroundColor:C.ink}, topo:{position:'absolute',top:0,left:0,right:0,height:210,backgroundColor:'#172944',borderBottomLeftRadius:110,borderBottomRightRadius:40,opacity:.8}, header:{height:76,paddingHorizontal:20,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, brand:{color:C.warm,fontSize:15,fontWeight:'900',letterSpacing:2}, brandSub:{color:C.muted,fontSize:10,marginTop:3}, headerBtns:{flexDirection:'row',gap:9}, iconBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,borderRadius:12}, helpBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.mint,borderRadius:12}, body:{flex:1}, scroll:{padding:20,paddingBottom:28,gap:14}, eyebrow:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, mini:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, sectionTitle:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2,marginTop:7}, h1:{color:C.warm,fontSize:31,lineHeight:36,fontWeight:'900',letterSpacing:-.6}, intro:{color:C.muted,fontSize:15,lineHeight:22,marginTop:-7,marginBottom:3}, card:{backgroundColor:C.surface,borderWidth:1,borderColor:'rgba(157,173,197,.14)',padding:16,borderRadius:18,gap:12}, streak:{backgroundColor:'#202e42',flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderColor:'#466176'}, streakNum:{color:C.warm,fontSize:37,fontWeight:'900',marginTop:2}, streakUnit:{fontSize:16,color:C.muted}, muted:{color:C.muted,fontSize:13,lineHeight:19}, sun:{height:56,width:56,borderRadius:28,backgroundColor:'#344154',alignItems:'center',justifyContent:'center'}, rowBetween:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:12}, row:{flexDirection:'row',alignItems:'center',gap:18}, cardTitle:{color:C.warm,fontSize:16,fontWeight:'800',lineHeight:21}, remote:{padding:10,backgroundColor:'#183c3a',borderRadius:12}, button:{backgroundColor:C.mint,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:12,borderRadius:12,marginTop:1}, buttonDark:{backgroundColor:C.raised,borderWidth:1,borderColor:C.line}, buttonText:{color:C.ink,fontWeight:'900',fontSize:14}, quote:{color:C.warm,fontSize:18,lineHeight:27,fontWeight:'600',paddingHorizontal:7,paddingVertical:9}, actionRow:{flexDirection:'row',gap:10}, quick:{flex:1,minHeight:95,backgroundColor:C.raised,borderRadius:16,padding:14,justifyContent:'space-between'}, quickText:{color:C.warm,fontSize:14,fontWeight:'800'}, support:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, supportText:{color:C.gold,fontWeight:'800',fontSize:13}, supportCard:{borderColor:'rgba(93,224,166,.36)'}, supportBadge:{height:38,width:38,borderRadius:13,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, supportFinePrint:{color:C.muted,fontSize:12,lineHeight:17}, supportOptions:{flexDirection:'row',gap:8}, supportOption:{flex:1,backgroundColor:C.raised,borderWidth:1,borderColor:C.line,borderRadius:12,paddingVertical:11,alignItems:'center',gap:2}, supportPrice:{color:C.mint,fontSize:16,fontWeight:'900'}, supportOptionLabel:{color:C.muted,fontSize:9,fontWeight:'700',textAlign:'center'}, tabbar:{height:72,backgroundColor:'#141f31',borderTopWidth:1,borderColor:'#293850',flexDirection:'row',paddingHorizontal:2}, tab:{flex:1,alignItems:'center',justifyContent:'center',gap:3}, tabText:{color:C.muted,fontSize:8,fontWeight:'700'}, location:{flexDirection:'row',alignItems:'center',gap:7}, locationText:{color:C.warm,fontSize:13,fontWeight:'700'}, change:{color:C.mint,fontSize:12,fontWeight:'800',marginLeft:'auto'}, search:{flexDirection:'row',alignItems:'center',backgroundColor:C.surface,borderRadius:13,paddingHorizontal:13,borderWidth:1,borderColor:C.line}, input:{color:C.warm,height:46,flex:1,marginLeft:8,fontSize:14}, segmentScroll:{marginHorizontal:-20,paddingHorizontal:20,flexGrow:0}, segment:{paddingVertical:9,paddingHorizontal:14,marginRight:8,borderRadius:11,borderWidth:1,borderColor:C.line}, segmentActive:{backgroundColor:C.mint,borderColor:C.mint}, segmentText:{color:C.muted,fontWeight:'800',fontSize:13}, segmentTextActive:{color:C.ink}, results:{color:C.muted,fontSize:12,fontWeight:'700'}, meeting:{flexDirection:'row',gap:13}, time:{width:54,borderRightWidth:1,borderColor:C.line}, timeText:{color:C.warm,fontWeight:'900',fontSize:14}, timeZone:{color:C.muted,fontSize:10,marginTop:3}, meetingMeta:{color:C.blue,fontSize:12,fontWeight:'700',marginTop:2}, inlineAction:{flexDirection:'row',alignItems:'center',gap:5,marginTop:7}, inlineText:{color:C.mint,fontWeight:'800',fontSize:13}, empty:{alignItems:'center',paddingVertical:30}, xp:{backgroundColor:'#26304b',flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, xpNum:{color:C.gold,fontWeight:'900',fontSize:25,marginTop:3}, xpSmall:{fontSize:13,color:C.muted}, module:{gap:0}, moduleDot:{height:31,width:31,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,marginRight:11}, moduleDetail:{borderTopWidth:1,borderColor:C.line,marginTop:14,paddingTop:12,gap:7}, moduleCopy:{color:C.warm,lineHeight:20,fontSize:14,fontWeight:'700'}, step:{color:C.muted,fontSize:13}, calmTab:{flex:1}, hidden:{display:'none'}, playerCard:{alignItems:'center',paddingVertical:20,gap:8}, breathGuide:{height:220,width:220,alignSelf:'center',alignItems:'center',justifyContent:'center',marginVertical:8}, breathGuideOuter:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:2,borderColor:'rgba(93,224,166,.58)'}, breathGuideInner:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:1,borderColor:'rgba(117,184,255,.7)'}, breathGuideCenter:{alignItems:'center',gap:4}, breathGlow:{position:'absolute',width:200,height:200,borderRadius:100,backgroundColor:'rgba(93,224,166,.16)'}, breathFill:{position:'absolute',width:190,height:190,borderRadius:95,backgroundColor:'rgba(93,224,166,.22)'}, waveRipple:{position:'absolute',width:170,height:170,borderRadius:85,borderWidth:2,borderColor:C.blue}, breathPhase:{color:C.warm,fontSize:20,fontWeight:'900',marginTop:5}, breathCount:{color:C.muted,fontSize:12,textAlign:'center'}, timer:{color:C.warm,fontSize:38,fontWeight:'900',letterSpacing:1}, playButton:{alignSelf:'stretch',backgroundColor:C.mint,paddingVertical:13,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:9}, playText:{color:C.ink,fontSize:15,fontWeight:'900'}, sessionRow:{flexDirection:'row',gap:9}, session:{flex:1,paddingVertical:12,alignItems:'center',borderWidth:1,borderColor:C.line,borderRadius:12,backgroundColor:C.raised}, sessionActive:{backgroundColor:C.mint,borderColor:C.mint}, sessionText:{color:C.muted,fontWeight:'800'}, sessionTextActive:{color:C.ink}, visualRow:{flexDirection:'row',gap:8}, visualChoice:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,paddingVertical:10,borderRadius:11,borderWidth:1,borderColor:C.line,backgroundColor:C.raised}, visualChoiceActive:{backgroundColor:C.mint,borderColor:C.mint}, visualText:{color:C.muted,fontSize:12,fontWeight:'800'}, visualTextActive:{color:C.ink}, soundscapePicker:{flexDirection:'row',alignItems:'center',gap:10,padding:14,backgroundColor:C.raised,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapePickerText:{flex:1,color:C.warm,fontSize:14,fontWeight:'700'}, soundscapeRow:{flexDirection:'row',alignItems:'center',gap:12,padding:14,backgroundColor:C.surface,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapeRowActive:{backgroundColor:C.mint,borderColor:C.mint}, compose:{backgroundColor:C.mint,padding:14,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, composeText:{fontSize:14,color:C.ink,fontWeight:'900'}, postHead:{flexDirection:'row',alignItems:'center',gap:10}, avatar:{height:35,width:35,borderRadius:12,backgroundColor:'#476686',alignItems:'center',justifyContent:'center'}, avatarText:{color:C.warm,fontWeight:'900'}, postText:{color:C.warm,fontSize:15,lineHeight:22}, profile:{flexDirection:'row',alignItems:'center'}, bigAvatar:{width:56,height:56,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, bigAvatarText:{color:C.ink,fontSize:22,fontWeight:'900'}, achievement:{flexDirection:'row',alignItems:'center',gap:12,padding:14,borderWidth:1,borderColor:'#66583d',borderRadius:16}, setting:{flexDirection:'row',alignItems:'center',paddingVertical:11,borderBottomWidth:1,borderColor:C.line,gap:12}, modalBack:{flex:1,backgroundColor:'rgba(5,9,16,.7)',justifyContent:'flex-end'}, sheet:{backgroundColor:'#223047',padding:22,paddingBottom:35,borderTopLeftRadius:26,borderTopRightRadius:26,gap:13}, handle:{width:40,height:4,backgroundColor:C.muted,borderRadius:4,alignSelf:'center',opacity:.5}, sheetTitle:{color:C.warm,fontSize:22,fontWeight:'900'}, sheetCopy:{color:C.muted,lineHeight:21,fontSize:14}, composeInput:{color:C.warm,minHeight:105,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,textAlignVertical:'top',fontSize:15}, toast:{position:'absolute',left:20,right:20,bottom:84,backgroundColor:'#263a44',padding:13,borderRadius:13,flexDirection:'row',alignItems:'center',gap:8,borderWidth:1,borderColor:'#478f72'}, toastText:{color:C.warm,fontSize:13,fontWeight:'700',flex:1},
+  safe:{flex:1,backgroundColor:C.ink}, topo:{position:'absolute',top:0,left:0,right:0,height:210,backgroundColor:'#172944',borderBottomLeftRadius:110,borderBottomRightRadius:40,opacity:.8}, header:{height:76,paddingHorizontal:20,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, brand:{color:C.warm,fontSize:15,fontWeight:'900',letterSpacing:2}, brandSub:{color:C.muted,fontSize:10,marginTop:3}, headerBtns:{flexDirection:'row',gap:9}, iconBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,borderRadius:12}, helpBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.mint,borderRadius:12}, body:{flex:1}, scroll:{padding:20,paddingBottom:28,gap:14}, eyebrow:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, mini:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, sectionTitle:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2,marginTop:7}, h1:{color:C.warm,fontSize:31,lineHeight:36,fontWeight:'900',letterSpacing:-.6}, intro:{color:C.muted,fontSize:15,lineHeight:22,marginTop:-7,marginBottom:3}, card:{backgroundColor:C.surface,borderWidth:1,borderColor:'rgba(157,173,197,.14)',padding:16,borderRadius:18,gap:12}, streak:{backgroundColor:'#202e42',flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderColor:'#466176'}, streakNum:{color:C.warm,fontSize:37,fontWeight:'900',marginTop:2}, streakUnit:{fontSize:16,color:C.muted}, muted:{color:C.muted,fontSize:13,lineHeight:19}, sun:{height:56,width:56,borderRadius:28,backgroundColor:'#344154',alignItems:'center',justifyContent:'center'}, rowBetween:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:12}, row:{flexDirection:'row',alignItems:'center',gap:18}, cardTitle:{color:C.warm,fontSize:16,fontWeight:'800',lineHeight:21}, remote:{padding:10,backgroundColor:'#183c3a',borderRadius:12}, button:{backgroundColor:C.mint,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:12,borderRadius:12,marginTop:1}, buttonDark:{backgroundColor:C.raised,borderWidth:1,borderColor:C.line}, buttonText:{color:C.ink,fontWeight:'900',fontSize:14}, quote:{color:C.warm,fontSize:18,lineHeight:27,fontWeight:'600',paddingHorizontal:7,paddingVertical:9}, actionRow:{flexDirection:'row',gap:10}, quick:{flex:1,minHeight:95,backgroundColor:C.raised,borderRadius:16,padding:14,justifyContent:'space-between'}, quickText:{color:C.warm,fontSize:14,fontWeight:'800'}, support:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, supportText:{color:C.gold,fontWeight:'800',fontSize:13}, supportCard:{borderColor:'rgba(93,224,166,.36)'}, supportBadge:{height:38,width:38,borderRadius:13,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, supportFinePrint:{color:C.muted,fontSize:12,lineHeight:17}, supportOptions:{flexDirection:'row',gap:8}, supportOption:{flex:1,backgroundColor:C.raised,borderWidth:1,borderColor:C.line,borderRadius:12,paddingVertical:11,alignItems:'center',gap:2}, supportPrice:{color:C.mint,fontSize:16,fontWeight:'900'}, supportOptionLabel:{color:C.muted,fontSize:9,fontWeight:'700',textAlign:'center'}, tabbar:{height:72,backgroundColor:'#141f31',borderTopWidth:1,borderColor:'#293850',flexDirection:'row',paddingHorizontal:2}, tab:{flex:1,alignItems:'center',justifyContent:'center',gap:3}, tabText:{color:C.muted,fontSize:8,fontWeight:'700'}, location:{flexDirection:'row',alignItems:'center',gap:7}, locationText:{color:C.warm,fontSize:13,fontWeight:'700'}, change:{color:C.mint,fontSize:12,fontWeight:'800',marginLeft:'auto'}, search:{flexDirection:'row',alignItems:'center',backgroundColor:C.surface,borderRadius:13,paddingHorizontal:13,borderWidth:1,borderColor:C.line}, input:{color:C.warm,height:46,flex:1,marginLeft:8,fontSize:14}, segmentScroll:{marginHorizontal:-20,paddingHorizontal:20,flexGrow:0}, segment:{paddingVertical:9,paddingHorizontal:14,marginRight:8,borderRadius:11,borderWidth:1,borderColor:C.line}, segmentActive:{backgroundColor:C.mint,borderColor:C.mint}, segmentText:{color:C.muted,fontWeight:'800',fontSize:13}, segmentTextActive:{color:C.ink}, results:{color:C.muted,fontSize:12,fontWeight:'700'}, meeting:{flexDirection:'row',gap:13}, time:{width:54,borderRightWidth:1,borderColor:C.line}, timeText:{color:C.warm,fontWeight:'900',fontSize:14}, timeZone:{color:C.muted,fontSize:10,marginTop:3}, meetingMeta:{color:C.blue,fontSize:12,fontWeight:'700',marginTop:2}, inlineAction:{flexDirection:'row',alignItems:'center',gap:5,marginTop:7}, inlineText:{color:C.mint,fontWeight:'800',fontSize:13}, empty:{alignItems:'center',paddingVertical:30}, xp:{backgroundColor:'#26304b',flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, xpNum:{color:C.gold,fontWeight:'900',fontSize:25,marginTop:3}, xpSmall:{fontSize:13,color:C.muted}, module:{gap:0}, moduleDot:{height:31,width:31,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,marginRight:11}, moduleDetail:{borderTopWidth:1,borderColor:C.line,marginTop:14,paddingTop:12,gap:7}, moduleCopy:{color:C.warm,lineHeight:20,fontSize:14,fontWeight:'700'}, step:{color:C.muted,fontSize:13}, calmTab:{flex:1}, hidden:{display:'none'}, playerCard:{alignItems:'center',paddingVertical:20,gap:8}, breathGuide:{height:220,width:220,alignSelf:'center',alignItems:'center',justifyContent:'center',marginVertical:8}, breathGuideOuter:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:2,borderColor:'rgba(93,224,166,.58)'}, breathGuideInner:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:1,borderColor:'rgba(117,184,255,.7)'}, breathGuideCenter:{alignItems:'center',gap:4}, breathGlow:{position:'absolute',width:200,height:200,borderRadius:100,backgroundColor:'rgba(93,224,166,.16)'}, breathFill:{position:'absolute',width:190,height:190,borderRadius:95,backgroundColor:'rgba(93,224,166,.22)'}, waveRipple:{position:'absolute',width:170,height:170,borderRadius:85,borderWidth:2,borderColor:C.blue}, breathPhase:{color:C.warm,fontSize:20,fontWeight:'900',marginTop:5}, breathCount:{color:C.muted,fontSize:12,textAlign:'center'}, timer:{color:C.warm,fontSize:38,fontWeight:'900',letterSpacing:1}, playButton:{alignSelf:'stretch',backgroundColor:C.mint,paddingVertical:13,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:9}, playText:{color:C.ink,fontSize:15,fontWeight:'900'}, sessionRow:{flexDirection:'row',gap:9}, session:{flex:1,paddingVertical:12,alignItems:'center',borderWidth:1,borderColor:C.line,borderRadius:12,backgroundColor:C.raised}, sessionActive:{backgroundColor:C.mint,borderColor:C.mint}, sessionText:{color:C.muted,fontWeight:'800'}, sessionTextActive:{color:C.ink}, visualRow:{flexDirection:'row',gap:8}, visualChoice:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,paddingVertical:10,borderRadius:11,borderWidth:1,borderColor:C.line,backgroundColor:C.raised}, visualChoiceActive:{backgroundColor:C.mint,borderColor:C.mint}, visualText:{color:C.muted,fontSize:12,fontWeight:'800'}, visualTextActive:{color:C.ink}, soundscapePicker:{flexDirection:'row',alignItems:'center',gap:10,padding:14,backgroundColor:C.raised,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapePickerText:{flex:1,color:C.warm,fontSize:14,fontWeight:'700'}, soundscapeRow:{flexDirection:'row',alignItems:'center',gap:12,padding:14,backgroundColor:C.surface,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapeRowActive:{backgroundColor:C.mint,borderColor:C.mint}, compose:{backgroundColor:C.mint,padding:14,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, composeText:{fontSize:14,color:C.ink,fontWeight:'900'}, postHead:{flexDirection:'row',alignItems:'center',gap:10}, avatar:{height:35,width:35,borderRadius:12,backgroundColor:'#476686',alignItems:'center',justifyContent:'center'}, avatarText:{color:C.warm,fontWeight:'900'}, avatarImg:{height:35,width:35,borderRadius:12,backgroundColor:C.raised}, memberAvatarImg:{height:57,width:57,borderRadius:18,backgroundColor:C.raised}, postText:{color:C.warm,fontSize:15,lineHeight:22}, profile:{flexDirection:'row',alignItems:'center'}, bigAvatar:{width:56,height:56,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, bigAvatarText:{color:C.ink,fontSize:22,fontWeight:'900'}, achievement:{flexDirection:'row',alignItems:'center',gap:12,padding:14,borderWidth:1,borderColor:'#66583d',borderRadius:16}, setting:{flexDirection:'row',alignItems:'center',paddingVertical:11,borderBottomWidth:1,borderColor:C.line,gap:12}, modalBack:{flex:1,backgroundColor:'rgba(5,9,16,.7)',justifyContent:'flex-end'}, sheet:{backgroundColor:'#223047',padding:22,paddingBottom:35,borderTopLeftRadius:26,borderTopRightRadius:26,gap:13}, handle:{width:40,height:4,backgroundColor:C.muted,borderRadius:4,alignSelf:'center',opacity:.5}, sheetTitle:{color:C.warm,fontSize:22,fontWeight:'900'}, sheetCopy:{color:C.muted,lineHeight:21,fontSize:14}, composeInput:{color:C.warm,minHeight:105,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,textAlignVertical:'top',fontSize:15}, toast:{position:'absolute',left:20,right:20,bottom:84,backgroundColor:'#263a44',padding:13,borderRadius:13,flexDirection:'row',alignItems:'center',gap:8,borderWidth:1,borderColor:'#478f72'}, toastText:{color:C.warm,fontSize:13,fontWeight:'700',flex:1},
   onboardSafe:{flex:1,backgroundColor:C.ink}, onboardStar:{height:180,alignItems:'center',justifyContent:'center',backgroundColor:'#173047',borderBottomRightRadius:95,borderBottomLeftRadius:35}, welcomeBody:{padding:28,gap:15}, welcomeTitle:{color:C.warm,fontSize:38,fontWeight:'900',lineHeight:44,letterSpacing:-1}, welcomeCopy:{color:C.muted,fontSize:16,lineHeight:25,maxWidth:310}, welcomeBottom:{padding:24,gap:20,marginTop:'auto'}, textButton:{alignItems:'center',justifyContent:'center',flexDirection:'row',gap:6,padding:8}, textButtonLabel:{color:C.mint,fontSize:14,fontWeight:'800'}, onboardScroll:{padding:24,paddingTop:32,gap:17,paddingBottom:45}, onboardKicker:{color:C.mint,fontSize:11,fontWeight:'900',letterSpacing:1.5,marginTop:8}, onboardTitle:{color:C.warm,fontSize:32,lineHeight:38,fontWeight:'900',letterSpacing:-.7}, onboardCopy:{color:C.muted,fontSize:15,lineHeight:23,marginBottom:5}, field:{gap:6}, fieldLabel:{color:C.muted,fontSize:10,fontWeight:'900',letterSpacing:1}, fieldInput:{borderBottomWidth:1,borderColor:C.line,color:C.warm,paddingVertical:12,fontSize:16}, bioInput:{minHeight:82,textAlignVertical:'top',borderWidth:1,borderRadius:12,paddingHorizontal:12}, choiceWrap:{flexDirection:'row',flexWrap:'wrap',gap:8}, choice:{paddingVertical:10,paddingHorizontal:12,borderWidth:1,borderColor:C.line,borderRadius:10,flexDirection:'row',gap:6,alignItems:'center'}, choiceActive:{backgroundColor:C.mint,borderColor:C.mint}, choiceText:{color:C.muted,fontSize:13,fontWeight:'800'}, choiceTextActive:{color:C.ink}, statusNote:{color:C.gold,fontSize:13,lineHeight:19,backgroundColor:'#312b20',padding:12,borderRadius:10}, skip:{alignItems:'center',padding:7}, preferenceNote:{flexDirection:'row',gap:8,alignItems:'center',padding:10,backgroundColor:'#163636',borderWidth:1,borderColor:'#326d60',borderRadius:11}, preferenceText:{color:C.warm,fontSize:12,flex:1,lineHeight:17}, privacyAction:{flexDirection:'row',alignItems:'center',gap:12,padding:14,borderWidth:1,borderColor:C.line,borderRadius:15}, photoRow:{flexDirection:'row',alignItems:'center',gap:14,padding:14,backgroundColor:C.raised,borderRadius:14,borderWidth:1,borderColor:C.line}, journalScroll:{backgroundColor:'#151d2b'}, journalNew:{backgroundColor:C.mint,padding:14,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, journalEmpty:{minHeight:220,justifyContent:'center',alignItems:'center',gap:12,borderTopWidth:1,borderBottomWidth:1,borderColor:'#4d4a40',paddingHorizontal:36}, journalEntry:{backgroundColor:'#20263a',padding:18,gap:11,borderLeftWidth:2,borderColor:C.gold}, journalMood:{color:C.gold,fontSize:12,fontWeight:'800'}, journalBody:{color:C.warm,fontSize:16,lineHeight:25}, journalSheet:{backgroundColor:'#252b3a'}, moodRow:{flexDirection:'row',gap:7,flexWrap:'wrap'}, journalInput:{minHeight:190,color:C.warm,fontSize:17,lineHeight:26,textAlignVertical:'top',paddingVertical:10,borderBottomWidth:1,borderColor:'#665f4f'},
   splashSafe:{flex:1,backgroundColor:'#0b1420'}, splashBg:{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'#0b1420'}, splashBgAccent:{position:'absolute',top:'-20%',left:'-10%',right:'-10%',height:'70%',borderRadius:500,backgroundColor:'#112040',opacity:.7}, splashContent:{flex:1,alignItems:'center',justifyContent:'center',gap:14,paddingHorizontal:32}, splashStar:{position:'absolute',width:3,height:3,borderRadius:2,backgroundColor:C.warm}, splashLogoWrap:{height:130,width:130,alignItems:'center',justifyContent:'center',marginBottom:4}, splashRing:{position:'absolute',width:130,height:130,borderRadius:65,borderWidth:2,borderColor:C.mint}, splashIconOuter:{alignItems:'center',justifyContent:'center'}, splashIconBg:{position:'absolute',width:72,height:72,borderRadius:36,backgroundColor:'rgba(93,224,166,0.12)'}, splashIcon:{fontSize:44,textShadowColor:C.mint,textShadowRadius:18}, splashBrand:{color:C.warm,fontSize:22,fontWeight:'900',letterSpacing:4,marginTop:2}, splashTagline:{color:C.muted,fontSize:13,textAlign:'center',letterSpacing:.4}, splashMsgWrap:{borderTopWidth:1,borderColor:'#1f3050',paddingTop:20,alignItems:'center',minHeight:68,justifyContent:'center'}, splashMsg:{color:C.warm,fontSize:17,lineHeight:26,textAlign:'center',fontStyle:'italic',fontWeight:'600',letterSpacing:.2}, splashDots:{flexDirection:'row',gap:8,marginTop:10}, splashDot:{width:7,height:7,borderRadius:4,backgroundColor:C.mint},
   readingsEntry:{flexDirection:'row',alignItems:'center',gap:13,padding:14,backgroundColor:C.surface,borderRadius:16,borderWidth:1,borderColor:'rgba(93,224,166,.3)'},

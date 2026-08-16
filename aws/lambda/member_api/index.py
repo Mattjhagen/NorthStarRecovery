@@ -4,6 +4,7 @@ Single Lambda behind an API Gateway HTTP API with a Cognito JWT authorizer.
 Every member route derives identity from the verified JWT `sub`; member IDs
 in request bodies are never trusted. Message and post bodies are never logged.
 """
+import base64
 import hashlib
 import json
 import os
@@ -20,6 +21,9 @@ journal = dynamodb.Table(os.environ['JOURNAL_TABLE'])
 community = dynamodb.Table(os.environ['COMMUNITY_TABLE'])
 dms = dynamodb.Table(os.environ['DMS_TABLE'])
 cognito = boto3.client('cognito-idp')
+s3 = boto3.client('s3')
+AVATAR_BUCKET = os.environ.get('AVATAR_BUCKET', '')
+AVATAR_BASE_URL = os.environ.get('AVATAR_BASE_URL', '')
 
 MOODS = ['heavy', 'tender', 'steady', 'hopeful']
 POST_CATEGORIES = ['QUESTION', 'STORY', 'CHECK-IN']
@@ -51,8 +55,14 @@ def get_profile(member_id):
 
 
 def pseudonym_of(profile):
+    if profile.get('privacyMode'):
+        return 'Anonymous friend'
     name = (profile.get('pseudonym') or '').strip()
     return name[:40] if name else 'Anonymous friend'
+
+
+def avatar_of(profile):
+    return '' if profile.get('privacyMode') else (profile.get('avatarUrl') or '')
 
 
 def blocked_ids(profile):
@@ -87,6 +97,7 @@ def handle_posts(member_id, method, body):
         posts = [
             {
                 'id': i['postId'], 'author': i['pseudonym'], 'authorId': i['authorId'],
+                'avatar': i.get('authorAvatar', ''),
                 'bio': i.get('authorBio', ''), 'category': i['category'],
                 'body': i['body'], 'createdAt': i['createdAt'],
                 'commentCount': int(i.get('commentCount', 0)),
@@ -107,11 +118,13 @@ def handle_posts(member_id, method, body):
         community.put_item(Item={
             'pk': 'FEED', 'sk': f'{created}#{post_id}', 'postId': post_id,
             'authorId': member_id, 'pseudonym': pseudonym_of(me),
+            'authorAvatar': avatar_of(me),
             'authorBio': (me.get('bio') or '')[:280], 'category': category,
             'body': text, 'createdAt': created, 'commentCount': 0,
         })
         return reply(201, {'post': {
             'id': post_id, 'author': pseudonym_of(me), 'authorId': member_id,
+            'avatar': avatar_of(me),
             'bio': (me.get('bio') or '')[:280], 'category': category,
             'body': text, 'createdAt': created, 'commentCount': 0, 'mine': True,
         }})
@@ -138,6 +151,7 @@ def handle_comments(member_id, method, post_id, body):
         hidden = blocked_ids(me)
         comments = [
             {'id': i['commentId'], 'author': i['pseudonym'], 'authorId': i['authorId'],
+             'avatar': i.get('authorAvatar', ''),
              'bio': i.get('authorBio', ''), 'body': i['body'], 'createdAt': i['createdAt']}
             for i in items if i['authorId'] not in hidden
         ]
@@ -151,7 +165,8 @@ def handle_comments(member_id, method, post_id, body):
         community.put_item(Item={
             'pk': f'POST#{post_id}', 'sk': f'{created}#{comment_id}',
             'commentId': comment_id, 'authorId': member_id,
-            'pseudonym': pseudonym_of(me), 'authorBio': (me.get('bio') or '')[:280],
+            'pseudonym': pseudonym_of(me), 'authorAvatar': avatar_of(me),
+            'authorBio': (me.get('bio') or '')[:280],
             'body': text, 'createdAt': created,
         })
         community.update_item(
@@ -279,6 +294,28 @@ def handler(event, context):
     if params.get('threadId') is not None:
         return handle_messages(member_id, method, params['threadId'], body, query)
 
+    if path == '/v1/me/avatar' and method == 'POST':
+        if not AVATAR_BUCKET:
+            return reply(503, {'error': 'avatar_storage_unavailable'})
+        data = str((body or {}).get('imageBase64') or '')
+        if not data or len(data) > 400_000:
+            return reply(400, {'error': 'invalid_image'})
+        try:
+            raw = base64.b64decode(data, validate=True)
+        except Exception:
+            return reply(400, {'error': 'invalid_image'})
+        if len(raw) < 100 or raw[:3] != b'\xff\xd8\xff':
+            return reply(400, {'error': 'invalid_image'})
+        digest = hashlib.sha256(raw).hexdigest()[:10]
+        key = f'avatars/{member_id}-{digest}.jpg'
+        s3.put_object(Bucket=AVATAR_BUCKET, Key=key, Body=raw,
+                      ContentType='image/jpeg', CacheControl='public, max-age=31536000')
+        url = f'{AVATAR_BASE_URL}{key}'
+        profile = get_profile(member_id)
+        profile['avatarUrl'] = url
+        profiles.put_item(Item=profile)
+        return reply(200, {'avatarUrl': url})
+
     if path == '/v1/push-tokens' and method == 'POST':
         token = str((body or {}).get('token') or '').strip()
         if not token.startswith('ExponentPushToken') or len(token) > 120:
@@ -344,7 +381,7 @@ def handler(event, context):
     if method == 'PUT':
         try:
             profile = body['profile']
-            allowed = {'pseudonym', 'bio', 'dateOfBirth', 'gender', 'groupPreference', 'sobrietyDate'}
+            allowed = {'pseudonym', 'bio', 'dateOfBirth', 'gender', 'groupPreference', 'sobrietyDate', 'privacyMode'}
             if not isinstance(profile, dict) or any(key not in allowed for key in profile):
                 raise ValueError()
             if len(profile.get('pseudonym', '')) > 40 or len(profile.get('bio', '')) > 280:
@@ -352,6 +389,8 @@ def handler(event, context):
             if profile.get('gender') not in [None, 'woman', 'man', 'nonbinary', 'self-describe', 'prefer-not-to-say']:
                 raise ValueError()
             if profile.get('groupPreference') not in [None, 'women', 'men', 'all']:
+                raise ValueError()
+            if 'privacyMode' in profile and not isinstance(profile['privacyMode'], bool):
                 raise ValueError()
         except (ValueError, TypeError, KeyError):
             return reply(400, {'error': 'invalid_profile'})
