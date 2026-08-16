@@ -209,7 +209,25 @@ function Avatar({ photo, initial, size=56, radius=18 }) {
   </View>;
 }
 
+class ErrorBoundary extends React.Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    if (this.state.error) return (
+      <SafeAreaView style={{flex:1,backgroundColor:C.ink,alignItems:'center',justifyContent:'center',padding:32}}>
+        <Text style={{color:C.mint,fontSize:20,fontWeight:'800',marginBottom:12}}>Something went wrong</Text>
+        <Text style={{color:C.muted,fontSize:13,textAlign:'center'}}>{String(this.state.error?.message || this.state.error)}</Text>
+      </SafeAreaView>
+    );
+    return this.props.children;
+  }
+}
+
 export default function App() {
+  return <ErrorBoundary><AppInner/></ErrorBoundary>;
+}
+
+function AppInner() {
   const [authState, setAuthState] = useState('loading');
   const [tab, setTab] = useState('Today');
   const [bell, setBell] = useState(false);

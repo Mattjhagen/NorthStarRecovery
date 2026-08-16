@@ -7,6 +7,13 @@
     "userInterfaceStyle": "dark",
     "scheme": "northstar-recovery",
     "icon": "./assets/northstar-app-icon.png",
+    "newArchEnabled": false,
+    "backgroundColor": "#101827",
+    "splash": {
+      "image": "./assets/northstar-app-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#101827"
+    },
     "plugins": [
       [
         "expo-notifications",
