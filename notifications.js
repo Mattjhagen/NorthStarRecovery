@@ -138,6 +138,13 @@ const UPLIFTS = [
   'One more day. One more reason.',
 ];
 
+// Fires when the member taps a push notification (e.g. a DM alert), including
+// from a cold start. Returns an unsubscribe function.
+export function addNotificationTapListener(callback) {
+  const sub = Notifications.addNotificationResponseReceivedListener(callback);
+  return () => sub.remove();
+}
+
 // Remote push: register this device's Expo token so the backend can reach it
 // (used for DM notifications). Best-effort; returns the token or null.
 export async function getRemotePushToken(projectId) {
