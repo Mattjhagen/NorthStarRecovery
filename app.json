@@ -58,6 +58,11 @@
         ],
         "NSPhotoLibraryUsageDescription": "Northstar Recovery uses your photo library so you can set an optional profile photo.",
         "NSLocationWhenInUseUsageDescription": "Northstar uses your location to sort meetings by distance and, if you opt in, to send and receive nearby SOS support alerts. Only a coarse, city-level location is ever stored."
+      },
+      "icon": {
+        "light": "./assets/northstar-app-icon.png",
+        "dark": "./assets/northstar-app-icon.png",
+        "tinted": "./assets/northstar-app-icon-tinted.png"
       }
     },
     "android": {
