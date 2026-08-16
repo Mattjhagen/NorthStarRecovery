@@ -1,6 +1,6 @@
 ﻿import 'react-native-get-random-values';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Easing, Image, Linking, Modal, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View, ActivityIndicator } from 'react-native';
+import { Alert, Animated, Easing, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
@@ -470,7 +470,7 @@ function ProfileEditor({ profile, onSave, onCancel }) {
   };
   return (
     <SafeAreaView style={styles.onboardSafe}>
-      <ScrollView contentContainerStyle={styles.onboardScroll}>
+      <ScrollView contentContainerStyle={styles.onboardScroll} automaticallyAdjustKeyboardInsets>
         <View style={styles.rowBetween}><Pressable onPress={onCancel}><Icon name="close" color={C.warm}/></Pressable><Text style={styles.onboardKicker}>PROFILE & PRIVACY</Text></View>
         <Text style={styles.onboardTitle}>Only what feels right.</Text>
         <Text style={styles.onboardCopy}>Your pseudonym is what others may see — not your legal name. Recovery details stay private.</Text>
@@ -541,7 +541,7 @@ function Onboarding({ onComplete }) {
     </SafeAreaView>
   );
   if (mode==='signin') return (
-    <SafeAreaView style={styles.onboardSafe}><ScrollView contentContainerStyle={styles.onboardScroll}>
+    <SafeAreaView style={styles.onboardSafe}><ScrollView contentContainerStyle={styles.onboardScroll} automaticallyAdjustKeyboardInsets>
       <Pressable onPress={()=>setMode('welcome')}><Icon name="arrow-back" color={C.warm}/></Pressable>
       <Text style={styles.onboardKicker}>WELCOME BACK</Text><Text style={styles.onboardTitle}>Your space is here.</Text>
       <Field label="EMAIL" value={account.email} onChange={v=>setAccount(a=>({...a,email:v}))} placeholder="you@example.com"/>
@@ -552,7 +552,7 @@ function Onboarding({ onComplete }) {
     </ScrollView></SafeAreaView>
   );
   if (mode==='confirm') return (
-    <SafeAreaView style={styles.onboardSafe}><ScrollView contentContainerStyle={styles.onboardScroll}>
+    <SafeAreaView style={styles.onboardSafe}><ScrollView contentContainerStyle={styles.onboardScroll} automaticallyAdjustKeyboardInsets>
       <Text style={styles.onboardKicker}>CHECK YOUR EMAIL</Text><Text style={styles.onboardTitle}>One more step.</Text>
       <Text style={styles.onboardCopy}>We sent a 6-digit code to {account.email}.</Text>
       <Field label="CONFIRMATION CODE" value={code} onChange={setCode} placeholder="123456"/>
@@ -561,7 +561,7 @@ function Onboarding({ onComplete }) {
     </ScrollView></SafeAreaView>
   );
   if (mode==='profile') return (
-    <SafeAreaView style={styles.onboardSafe}><ScrollView contentContainerStyle={styles.onboardScroll}>
+    <SafeAreaView style={styles.onboardSafe}><ScrollView contentContainerStyle={styles.onboardScroll} automaticallyAdjustKeyboardInsets>
       <Text style={styles.onboardKicker}>WELCOME TO NORTHSTAR</Text><Text style={styles.onboardTitle}>Tell us a little about you.</Text>
       <Text style={styles.onboardCopy}>All optional. Only your pseudonym may be visible to other members.</Text>
       <Field label="PSEUDONYM (OPTIONAL)" value={profile.pseudonym} onChange={v=>setProfile(p=>({...p,pseudonym:v}))} placeholder="How should we know you?" autoCapitalize="words"/>
@@ -573,7 +573,7 @@ function Onboarding({ onComplete }) {
     </ScrollView></SafeAreaView>
   );
   return (
-    <SafeAreaView style={styles.onboardSafe}><ScrollView contentContainerStyle={styles.onboardScroll}>
+    <SafeAreaView style={styles.onboardSafe}><ScrollView contentContainerStyle={styles.onboardScroll} automaticallyAdjustKeyboardInsets>
       <Pressable onPress={()=>setMode('welcome')}><Icon name="arrow-back" color={C.warm}/></Pressable>
       <Text style={styles.onboardKicker}>CREATE ACCOUNT</Text><Text style={styles.onboardTitle}>A secure beginning.</Text>
       <Text style={styles.onboardCopy}>Your email is used only for account access. It is never shown to other members.</Text>
@@ -1130,7 +1130,7 @@ function Connect({ say }) {
       ))}
       {visiblePosts.length===0&&<View style={styles.boardEmpty}><Icon name="shield-outline" size={31} color={C.mint}/><Text style={styles.cardTitle}>Your circle is quiet.</Text></View>}
       <Modal visible={compose} transparent animationType="slide">
-        <Pressable style={styles.modalBack} onPress={()=>setCompose(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1}}><Pressable style={styles.modalBack} onPress={()=>setCompose(false)}>
           <Pressable style={styles.sheet} onPress={()=>{}}>
             <View style={styles.handle}/><Text style={styles.sheetTitle}>Share with care</Text>
             <Text style={styles.sheetCopy}>If you may hurt yourself or someone else, call or text 988.</Text>
@@ -1139,10 +1139,10 @@ function Connect({ say }) {
             <TextInput multiline value={draft} onChangeText={setDraft} placeholder="Write what feels true…" placeholderTextColor={C.muted} style={styles.composeInput}/>
             <Button label="Share" onPress={publish} icon="paper-plane"/>
           </Pressable>
-        </Pressable>
+        </Pressable></KeyboardAvoidingView>
       </Modal>
       <Modal visible={!!postSheet} transparent animationType="slide">
-        <Pressable style={styles.modalBack} onPress={()=>setPostSheet(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1}}><Pressable style={styles.modalBack} onPress={()=>setPostSheet(null)}>
           <Pressable style={[styles.sheet,styles.postSheet]} onPress={()=>{}}>
             {postSheet&&<><View style={styles.handle}/>
               <ScrollView style={styles.threadScroll} contentContainerStyle={styles.threadContent} showsVerticalScrollIndicator={false}>
@@ -1162,7 +1162,7 @@ function Connect({ say }) {
               </View>
             </>}
           </Pressable>
-        </Pressable>
+        </Pressable></KeyboardAvoidingView>
       </Modal>
       <Modal visible={!!member} transparent animationType="slide">
         <Pressable style={styles.modalBack} onPress={()=>setMember(null)}>
@@ -1177,7 +1177,7 @@ function Connect({ say }) {
         </Pressable>
       </Modal>
       <Modal visible={!!dm} transparent animationType="slide">
-        <Pressable style={styles.modalBack} onPress={()=>setDm(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1}}><Pressable style={styles.modalBack} onPress={()=>setDm(null)}>
           <Pressable style={styles.sheet} onPress={()=>{}}>
             {dm&&<><View style={styles.handle}/><Text style={styles.mini}>DIRECT MESSAGE</Text><Text style={styles.sheetTitle}>Message {dm.author}</Text>
               {!online&&<Text style={styles.sheetCopy}>Messaging needs a connection. Try again when you're back online.</Text>}
@@ -1198,7 +1198,7 @@ function Connect({ say }) {
               </>}
               <Button label="Close" onPress={()=>setDm(null)} icon="close" kind="dark"/></>}
           </Pressable>
-        </Pressable>
+        </Pressable></KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );
@@ -1220,7 +1220,7 @@ function Journal({ say, entries, onAdd }) {
         <View key={e.id} style={styles.journalEntry}><View style={styles.rowBetween}><Text style={styles.mini}>{typeof e.date==='string'?e.date.toUpperCase():e.date}</Text><Text style={styles.journalMood}>{e.mood}</Text></View><Text style={styles.journalBody}>{e.body}</Text></View>
       ))}
       <Modal visible={open} transparent animationType="slide">
-        <View style={styles.modalBack}><View style={[styles.sheet,styles.journalSheet]}>
+        <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1}}><View style={styles.modalBack}><View style={[styles.sheet,styles.journalSheet]}>
           <View style={styles.handle}/>
           <View style={styles.rowBetween}><Text style={styles.sheetTitle}>A private page</Text><Pressable onPress={()=>setOpen(false)}><Icon name="close" color={C.muted}/></Pressable></View>
           <Text style={styles.sheetCopy}>Entries are encrypted and belong only to you.</Text>
@@ -1228,7 +1228,7 @@ function Journal({ say, entries, onAdd }) {
           <View style={styles.moodRow}>{['Heavy','Tender','Steady','Hopeful'].map(x=><Choice key={x} label={x} active={mood===x} onPress={()=>setMood(x)}/>)}</View>
           <TextInput value={body} onChangeText={setBody} multiline autoFocus placeholder="There is room for the honest version…" placeholderTextColor={C.muted} style={styles.journalInput}/>
           <Button label="Keep entry" onPress={save} icon="bookmark-outline"/>
-        </View></View>
+        </View></View></KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );
