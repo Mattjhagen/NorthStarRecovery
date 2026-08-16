@@ -13,7 +13,7 @@ import * as Application from 'expo-application';
 import * as Clipboard from 'expo-clipboard';
 import * as SecureStore from 'expo-secure-store';
 import * as Contacts from 'expo-contacts';
-import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, cancelMeetingReminders, sendLocalNotification, getRemotePushToken } from './notifications';
+import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, cancelMeetingReminders, sendLocalNotification, getRemotePushToken, addNotificationTapListener } from './notifications';
 import { READINGS } from './readings';
 import { createAccount, confirmAccount, signInWithPassword, restoreSignedInUser, signOutEverywhere } from './auth';
 import { apiRequest, isBackendConfigured } from './backend';
@@ -305,6 +305,38 @@ function AppInner() {
 
   const [authEmail, setAuthEmail] = useState('');
   const [sosEnabled, setSosEnabled] = useState(false);
+  const [dmThreads, setDmThreads] = useState([]);
+  const [dmReadMap, setDmReadMap] = useState({});
+  const [dmReadMapLoaded, setDmReadMapLoaded] = useState(false);
+  const [pendingDmPeer, setPendingDmPeer] = useState(null);
+  useEffect(() => {
+    SecureStore.getItemAsync('northstar.dm-read-map')
+      .then(v => { try { setDmReadMap(v ? JSON.parse(v) : {}); } catch {} })
+      .finally(() => setDmReadMapLoaded(true));
+  }, []);
+  const markThreadRead = threadId => setDmReadMap(prev => {
+    const next = { ...prev, [threadId]: new Date().toISOString() };
+    SecureStore.setItemAsync('northstar.dm-read-map', JSON.stringify(next)).catch(()=>{});
+    return next;
+  });
+  const loadDmThreads = () => {
+    if (!isBackendConfigured()) return;
+    apiRequest('/v1/dms').then(data => { if (data?.threads) setDmThreads(data.threads); }).catch(()=>{});
+  };
+  useEffect(() => {
+    if (authState !== 'authenticated') return;
+    loadDmThreads();
+    const timer = setInterval(loadDmThreads, 20000);
+    return () => clearInterval(timer);
+  }, [authState]);
+  useEffect(() => addNotificationTapListener(() => { setTab('Messages'); loadDmThreads(); }), []);
+  const unreadDmThreads = dmThreads.filter(t => t.lastMessageAt && t.lastMessageAt > (dmReadMap[t.threadId] || ''));
+  const unreadDmCount = unreadDmThreads.length;
+  const openMessagePeer = target => {
+    if (!target?.authorId) { say("This member can't receive messages yet."); return; }
+    setPendingDmPeer(target); setTab('Messages');
+  };
+  const openThreadFromBell = t => { setPendingDmPeer({ authorId:t.peerId, author:t.peer }); setTab('Messages'); };
   const [learnComplete, setLearnComplete] = useState(1);
   useEffect(()=>{ SecureStore.getItemAsync('northstar.learn-complete').then(v=>{ const n=parseInt(v,10); if(Number.isFinite(n)&&n>1) setLearnComplete(n); }).catch(()=>{}); },[]);
   const advanceLearn = id => { setLearnComplete(id); SecureStore.setItemAsync('northstar.learn-complete', String(id)).catch(()=>{}); };
@@ -453,7 +485,7 @@ function AppInner() {
       <View style={styles.header}>
         <View><Text style={styles.brand}>NORTHSTAR</Text><Text style={styles.brandSub}>recovery, one steady step at a time</Text></View>
         <View style={styles.headerBtns}>
-          <Pressable onPress={()=>setBell(true)} style={styles.iconBtn}><Icon name="notifications-outline"/></Pressable>
+          <Pressable onPress={()=>setBell(true)} style={styles.iconBtn}><Icon name="notifications-outline"/>{unreadDmCount>0&&<View style={styles.badgeDot}/>}</Pressable>
           <Pressable onPress={support} style={styles.helpBtn}><Icon name="heart-outline" color={C.ink}/></Pressable>
         </View>
       </View>
@@ -464,14 +496,18 @@ function AppInner() {
         <View style={[styles.calmTab, tab!=='Calm'&&styles.hidden]}>
           <Calm player={calmPlayer} soundscape={currentSoundscape} soundscapes={SOUNDSCAPES} onSelectSoundscape={setCurrentSoundscape}/>
         </View>
-        {tab==='Connect'  && <Connect say={say}/>}
+        {tab==='Connect'  && <Connect say={say} onMessage={openMessagePeer}/>}
+        {tab==='Messages' && <Messages say={say} threads={dmThreads} loading={!dmReadMapLoaded} pendingPeer={pendingDmPeer} onClearPending={()=>setPendingDmPeer(null)} readMap={dmReadMap} onMarkRead={markThreadRead} onRefresh={loadDmThreads}/>}
         {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={authEmail.toLowerCase()==='matty@purepulse.one'} sosEnabled={sosEnabled} onToggleSos={toggleSos} onInviteSent={earnInviteXP}/>}
         {tab==='Journal'  && <Journal say={say} entries={journalEntries} onAdd={addJournalEntry}/>}
       </View>
       <View style={styles.tabbar}>
-        {[['Today','home-outline'],['Meetings','compass-outline'],['Learn','sparkles-outline'],['Calm','headset-outline'],['Connect','people-outline'],['You','person-outline']].map(([label,icon])=>
+        {[['Today','home-outline'],['Meetings','compass-outline'],['Learn','sparkles-outline'],['Calm','headset-outline'],['Connect','people-outline'],['Messages','chatbubbles-outline'],['You','person-outline']].map(([label,icon])=>
           <Pressable key={label} onPress={()=>setTab(label)} style={styles.tab}>
-            <Icon name={icon} size={22} color={tab===label?C.mint:C.muted}/>
+            <View>
+              <Icon name={icon} size={22} color={tab===label?C.mint:C.muted}/>
+              {label==='Messages'&&unreadDmCount>0&&<View style={styles.badgeDot}/>}
+            </View>
             <Text style={[styles.tabText,tab===label&&{color:C.mint}]}>{label}</Text>
           </Pressable>
         )}
@@ -480,6 +516,19 @@ function AppInner() {
         <Pressable style={styles.modalBack} onPress={()=>setBell(false)}>
           <Pressable style={styles.sheet} onPress={()=>{}}>
             <View style={styles.handle}/>
+            {unreadDmThreads.length>0&&<>
+              <Text style={styles.sheetTitle}>New messages</Text>
+              {unreadDmThreads.slice(0,5).map(t=>(
+                <Pressable key={t.threadId} style={styles.dmPreviewRow} onPress={()=>{setBell(false);openThreadFromBell(t);}}>
+                  <View style={styles.dmPreviewAvatar}><Text style={styles.bigAvatarText}>{(t.peer||'?').charAt(0).toUpperCase()}</Text></View>
+                  <View style={{flex:1}}>
+                    <Text style={styles.commentName}>{t.peer}</Text>
+                    <Text style={styles.muted} numberOfLines={1}>{t.preview}</Text>
+                  </View>
+                </Pressable>
+              ))}
+              <View style={styles.bellDivider}/>
+            </>}
             <Text style={styles.sheetTitle}>Reminders</Text>
             <Text style={styles.sheetCopy}>Meeting reminders and daily uplifts are set in the You tab under Reminders.</Text>
             <Button label="Got it" onPress={()=>setBell(false)} icon="checkmark"/>
@@ -1186,16 +1235,12 @@ function timeAgo(iso) {
   return `${Math.floor(mins/1440)}d ago`;
 }
 
-function Connect({ say }) {
+function Connect({ say, onMessage }) {
   const [posts, setPosts] = useState([]);
   const [blocked, setBlocked] = useState([]);
   const [compose, setCompose] = useState(false);
   const [postSheet, setPostSheet] = useState(null);
   const [member, setMember] = useState(null);
-  const [dm, setDm] = useState(null);
-  const [dmThread, setDmThread] = useState(null);
-  const [dmMessages, setDmMessages] = useState([]);
-  const [dmDraft, setDmDraft] = useState('');
   const [category, setCategory] = useState('Question');
   const [draft, setDraft] = useState('');
   const [comment, setComment] = useState('');
@@ -1273,28 +1318,6 @@ function Connect({ say }) {
       .catch(()=>{});
   };
 
-  const openDm = target => {
-    setMember(null); setDm(target); setDmMessages([]); setDmThread(null);
-    if (!online || !target.authorId) return;
-    apiRequest('/v1/dms',{method:'POST',body:JSON.stringify({peerId:target.authorId})})
-      .then(data=>setDmThread(data.thread.threadId))
-      .catch(()=>say('Messaging is unavailable right now.'));
-  };
-  useEffect(() => {
-    if (!dmThread) return;
-    let live = true;
-    const pull = () => apiRequest(`/v1/dms/${dmThread}/messages`).then(data=>{ if(live&&data?.messages) setDmMessages(data.messages); }).catch(()=>{});
-    pull();
-    const timer = setInterval(pull, 5000);
-    return () => { live = false; clearInterval(timer); };
-  }, [dmThread]);
-  const sendDm = () => {
-    if (!dmDraft.trim() || !dmThread) return;
-    const text = dmDraft.trim(); setDmDraft('');
-    apiRequest(`/v1/dms/${dmThread}/messages`,{method:'POST',body:JSON.stringify({body:text})})
-      .then(data=>setDmMessages(m=>[...m,data.message]))
-      .catch(()=>say('Message not sent. Try again.'));
-  };
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <Text style={styles.eyebrow}>PRIVATE COMMUNITY</Text><Text style={styles.h1}>The circle</Text>
@@ -1376,36 +1399,107 @@ function Connect({ say }) {
               <View style={styles.memberHero}>{member.avatar?<Image source={{uri:member.avatar}} style={styles.memberAvatarImg}/>:<View style={styles.memberAvatar}><Text style={styles.bigAvatarText}>{member.initial}</Text></View>}<View style={{flex:1}}><Text style={styles.sheetTitle}>{member.author}</Text><Text style={styles.muted}>Member profile</Text></View></View>
               <Text style={styles.sheetCopy}>{member.bio||'No bio.'}</Text>
               {member.authorId?<Button label={member.following?'Following ✓':'Follow'} onPress={()=>toggleFollow(member)} kind={member.following?'dark':undefined} icon={member.following?'checkmark':'person-add-outline'}/>:null}
-              <Button label="Message privately" onPress={()=>openDm(member)} icon="chatbubble-outline"/>
+              <Button label="Message privately" onPress={()=>{const target=member;setMember(null);onMessage(target);}} icon="chatbubble-outline"/>
               <Pressable style={styles.dangerAction} onPress={()=>blockMember(member)}><Icon name="eye-off-outline" color={C.gold}/><Text style={styles.dangerText}>Block member</Text></Pressable>
             </>}
           </Pressable>
         </Pressable>
       </Modal>
-      <Modal visible={!!dm} transparent animationType="slide">
-        <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1}}><Pressable style={styles.modalBack} onPress={()=>setDm(null)}>
-          <Pressable style={styles.sheet} onPress={()=>{}}>
-            {dm&&<><View style={styles.handle}/><Text style={styles.mini}>DIRECT MESSAGE</Text><Text style={styles.sheetTitle}>Message {dm.author}</Text>
-              {!online&&<Text style={styles.sheetCopy}>Messaging needs a connection. Try again when you're back online.</Text>}
-              {online&&!dm.authorId&&<Text style={styles.sheetCopy}>This member can't receive messages yet.</Text>}
-              {online&&dm.authorId&&<>
-                <ScrollView style={styles.threadScroll} contentContainerStyle={styles.threadContent} showsVerticalScrollIndicator={false}>
-                  {dmMessages.length===0&&<Text style={styles.sheetCopy}>Say hello — messages are private between the two of you. Be kind; you can block or report anytime.</Text>}
-                  {dmMessages.map(m=>(
-                    <View key={m.id} style={[styles.comment,m.mine&&{backgroundColor:'#1d4038',alignSelf:'flex-end',maxWidth:'85%'},!m.mine&&{alignSelf:'flex-start',maxWidth:'85%'}]}>
-                      <Text style={styles.commentName}>{m.mine?'You':dm.author}</Text><Text style={styles.muted}>{m.body}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
-                <View style={styles.threadComposer}>
-                  <TextInput value={dmDraft} onChangeText={setDmDraft} placeholder="Write something kind…" placeholderTextColor={C.muted} style={styles.commentInput}/>
-                  <Button label="Send" onPress={sendDm} icon="paper-plane"/>
-                </View>
-              </>}
-              <Button label="Close" onPress={()=>setDm(null)} icon="close" kind="dark"/></>}
+    </ScrollView>
+  );
+}
+
+// ─── MESSAGES ───────────────────────────────────────────────────────────────
+function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap, onMarkRead, onRefresh }) {
+  const [activeThread, setActiveThread] = useState(null);
+  const [msgs, setMsgs] = useState([]);
+  const [draft, setDraft] = useState('');
+  const online = isBackendConfigured();
+
+  useEffect(() => {
+    if (!pendingPeer) return;
+    if (!online) { say("Messaging needs a connection. Try again when you're back online."); onClearPending(); return; }
+    apiRequest('/v1/dms',{method:'POST',body:JSON.stringify({peerId:pendingPeer.authorId})})
+      .then(data=>setActiveThread({threadId:data.thread.threadId,peerId:data.thread.peerId,peer:data.thread.peer}))
+      .catch(()=>say('Messaging is unavailable right now.'))
+      .finally(onClearPending);
+  }, [pendingPeer]);
+
+  useEffect(() => {
+    if (!activeThread) return;
+    onMarkRead(activeThread.threadId);
+    let live = true;
+    const pull = () => apiRequest(`/v1/dms/${activeThread.threadId}/messages`).then(data=>{ if(live&&data?.messages) setMsgs(data.messages); }).catch(()=>{});
+    pull();
+    const timer = setInterval(pull, 5000);
+    return () => { live = false; clearInterval(timer); };
+  }, [activeThread]);
+
+  const openThread = t => { setActiveThread(t); setMsgs([]); onMarkRead(t.threadId); };
+  const send = () => {
+    if (!draft.trim() || !activeThread) return;
+    const text = draft.trim(); setDraft('');
+    apiRequest(`/v1/dms/${activeThread.threadId}/messages`,{method:'POST',body:JSON.stringify({body:text})})
+      .then(data=>{ setMsgs(m=>[...m,data.message]); onRefresh(); })
+      .catch(()=>say('Message not sent. Try again.'));
+  };
+
+  if (!online) return (
+    <ScrollView contentContainerStyle={styles.scroll}>
+      <Text style={styles.eyebrow}>PRIVATE</Text><Text style={styles.h1}>Messages</Text>
+      <Text style={styles.intro}>Messaging needs a connection. Try again when you're back online.</Text>
+    </ScrollView>
+  );
+
+  if (activeThread) return (
+    <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1}}>
+      <View style={[styles.scroll,{flex:1,paddingBottom:12}]}>
+        <Pressable onPress={()=>{setActiveThread(null);onRefresh();}} style={styles.inlineAction}><Icon name="chevron-back" color={C.mint}/><Text style={styles.inlineText}>All messages</Text></Pressable>
+        <Text style={styles.h1}>{activeThread.peer}</Text>
+        <ScrollView style={[styles.threadScroll,{flex:1}]} contentContainerStyle={styles.threadContent} showsVerticalScrollIndicator={false}>
+          {msgs.length===0&&<Text style={styles.sheetCopy}>Say hello — messages are private between the two of you. Be kind; you can block or report anytime.</Text>}
+          {msgs.map(m=>(
+            <View key={m.id} style={[styles.comment,m.mine&&{backgroundColor:'#1d4038',alignSelf:'flex-end',maxWidth:'85%'},!m.mine&&{alignSelf:'flex-start',maxWidth:'85%'}]}>
+              <Text style={styles.commentName}>{m.mine?'You':activeThread.peer}</Text><Text style={styles.muted}>{m.body}</Text>
+            </View>
+          ))}
+        </ScrollView>
+        <View style={styles.threadComposer}>
+          <TextInput value={draft} onChangeText={setDraft} placeholder="Write something kind…" placeholderTextColor={C.muted} style={styles.commentInput}/>
+          <Button label="Send" onPress={send} icon="paper-plane"/>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  );
+
+  return (
+    <ScrollView contentContainerStyle={styles.scroll}>
+      <Text style={styles.eyebrow}>PRIVATE</Text><Text style={styles.h1}>Messages</Text>
+      <Text style={styles.intro}>Conversations with friends from the circle.</Text>
+      {loading&&threads.length===0&&<ActivityIndicator color={C.mint}/>}
+      {!loading&&threads.length===0&&(
+        <View style={styles.boardEmpty}>
+          <Icon name="chatbubbles-outline" size={34} color={C.gold}/>
+          <Text style={styles.cardTitle}>No conversations yet.</Text>
+          <Text style={[styles.muted,{textAlign:'center'}]}>Message a member from the Connect tab to start one.</Text>
+        </View>
+      )}
+      {threads.map(t=>{
+        const unread = t.lastMessageAt && t.lastMessageAt > (readMap[t.threadId]||'');
+        return (
+          <Pressable key={t.threadId} style={styles.dmRow} onPress={()=>openThread(t)}>
+            <View style={styles.memberAvatar}><Text style={styles.bigAvatarText}>{(t.peer||'?').charAt(0).toUpperCase()}</Text></View>
+            <View style={{flex:1}}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.cardTitle}>{t.peer}</Text>
+                <Text style={styles.mini}>{timeAgo(t.lastMessageAt)}</Text>
+              </View>
+              <Text style={[styles.muted,unread&&{color:C.warm,fontWeight:'700'}]} numberOfLines={1}>{t.preview}</Text>
+            </View>
+            {unread&&<View style={styles.dmDot}/>}
           </Pressable>
-        </Pressable></KeyboardAvoidingView>
-      </Modal>
+        );
+      })}
     </ScrollView>
   );
 }
@@ -1825,6 +1919,7 @@ function AdminReports({ visible, onClose, say }) {
 const styles = StyleSheet.create({
   standard:{flexDirection:'row',gap:9,padding:13,borderLeftWidth:2,borderColor:C.mint,backgroundColor:'#16343a'}, standardText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, boardPost:{gap:11}, topic:{color:C.mint,fontSize:10,fontWeight:'900',letterSpacing:1.2}, postTime:{color:C.muted,fontSize:11}, tapHint:{color:C.blue,fontSize:11,marginTop:1}, commentAction:{flexDirection:'row',alignItems:'center',gap:7,paddingTop:11,borderTopWidth:1,borderColor:C.line}, commentActionText:{color:C.mint,fontSize:12,fontWeight:'800',flex:1}, boardEmpty:{minHeight:180,justifyContent:'center',alignItems:'center',gap:10,padding:24,borderWidth:1,borderColor:C.line,borderRadius:17}, memberHero:{flexDirection:'row',alignItems:'center',gap:13}, memberAvatar:{height:57,width:57,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, profileSafety:{flexDirection:'row',gap:9,padding:12,backgroundColor:'#17363a',borderRadius:12}, profileSafetyText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, dangerAction:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, dangerText:{color:C.gold,fontWeight:'800',fontSize:14}, postSheet:{height:'88%',paddingBottom:20}, threadScroll:{flexGrow:0,flexShrink:1}, threadContent:{gap:12,paddingBottom:8}, threadComposer:{gap:8,paddingTop:10,borderTopWidth:1,borderColor:C.line}, comment:{padding:11,backgroundColor:C.raised,borderRadius:11,gap:3}, commentName:{color:C.warm,fontWeight:'800',fontSize:13}, commentInput:{color:C.warm,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,minHeight:52,fontSize:14},
   safe:{flex:1,backgroundColor:C.ink}, topo:{position:'absolute',top:0,left:0,right:0,height:210,backgroundColor:'#172944',borderBottomLeftRadius:110,borderBottomRightRadius:40,opacity:.8}, header:{height:76,paddingHorizontal:20,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, brand:{color:C.warm,fontSize:15,fontWeight:'900',letterSpacing:2}, brandSub:{color:C.muted,fontSize:10,marginTop:3}, headerBtns:{flexDirection:'row',gap:9}, iconBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,borderRadius:12}, helpBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.mint,borderRadius:12}, body:{flex:1}, scroll:{padding:20,paddingBottom:28,gap:14}, eyebrow:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, mini:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, sectionTitle:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2,marginTop:7}, h1:{color:C.warm,fontSize:31,lineHeight:36,fontWeight:'900',letterSpacing:-.6}, intro:{color:C.muted,fontSize:15,lineHeight:22,marginTop:-7,marginBottom:3}, card:{backgroundColor:C.surface,borderWidth:1,borderColor:'rgba(157,173,197,.14)',padding:16,borderRadius:18,gap:12}, streak:{backgroundColor:'#202e42',flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderColor:'#466176'}, streakNum:{color:C.warm,fontSize:37,fontWeight:'900',marginTop:2}, streakUnit:{fontSize:16,color:C.muted}, muted:{color:C.muted,fontSize:13,lineHeight:19}, sun:{height:56,width:56,borderRadius:28,backgroundColor:'#344154',alignItems:'center',justifyContent:'center'}, rowBetween:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:12}, row:{flexDirection:'row',alignItems:'center',gap:18}, cardTitle:{color:C.warm,fontSize:16,fontWeight:'800',lineHeight:21}, remote:{padding:10,backgroundColor:'#183c3a',borderRadius:12}, button:{backgroundColor:C.mint,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:12,borderRadius:12,marginTop:1}, buttonDark:{backgroundColor:C.raised,borderWidth:1,borderColor:C.line}, buttonText:{color:C.ink,fontWeight:'900',fontSize:14}, quote:{color:C.warm,fontSize:18,lineHeight:27,fontWeight:'600',paddingHorizontal:7,paddingVertical:9}, actionRow:{flexDirection:'row',gap:10}, quick:{flex:1,minHeight:95,backgroundColor:C.raised,borderRadius:16,padding:14,justifyContent:'space-between'}, quickText:{color:C.warm,fontSize:14,fontWeight:'800'}, support:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, supportText:{color:C.gold,fontWeight:'800',fontSize:13}, supportCard:{borderColor:'rgba(93,224,166,.36)'}, supportBadge:{height:38,width:38,borderRadius:13,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, supportFinePrint:{color:C.muted,fontSize:12,lineHeight:17}, supportOptions:{flexDirection:'row',gap:8}, supportOption:{flex:1,backgroundColor:C.raised,borderWidth:1,borderColor:C.line,borderRadius:12,paddingVertical:11,alignItems:'center',gap:2}, supportPrice:{color:C.mint,fontSize:16,fontWeight:'900'}, supportOptionLabel:{color:C.muted,fontSize:9,fontWeight:'700',textAlign:'center'}, tabbar:{height:72,backgroundColor:'#141f31',borderTopWidth:1,borderColor:'#293850',flexDirection:'row',paddingHorizontal:2}, tab:{flex:1,alignItems:'center',justifyContent:'center',gap:3}, tabText:{color:C.muted,fontSize:8,fontWeight:'700'}, location:{flexDirection:'row',alignItems:'center',gap:7}, locationText:{color:C.warm,fontSize:13,fontWeight:'700'}, change:{color:C.mint,fontSize:12,fontWeight:'800',marginLeft:'auto'}, search:{flexDirection:'row',alignItems:'center',backgroundColor:C.surface,borderRadius:13,paddingHorizontal:13,borderWidth:1,borderColor:C.line}, input:{color:C.warm,height:46,flex:1,marginLeft:8,fontSize:14}, segmentScroll:{marginHorizontal:-20,paddingHorizontal:20,flexGrow:0}, segment:{paddingVertical:9,paddingHorizontal:14,marginRight:8,borderRadius:11,borderWidth:1,borderColor:C.line}, segmentActive:{backgroundColor:C.mint,borderColor:C.mint}, segmentText:{color:C.muted,fontWeight:'800',fontSize:13}, segmentTextActive:{color:C.ink}, results:{color:C.muted,fontSize:12,fontWeight:'700'}, meeting:{flexDirection:'row',gap:13}, time:{width:54,borderRightWidth:1,borderColor:C.line}, timeText:{color:C.warm,fontWeight:'900',fontSize:14}, timeZone:{color:C.muted,fontSize:10,marginTop:3}, meetingMeta:{color:C.blue,fontSize:12,fontWeight:'700',marginTop:2}, inlineAction:{flexDirection:'row',alignItems:'center',gap:5,marginTop:7}, inlineText:{color:C.mint,fontWeight:'800',fontSize:13}, empty:{alignItems:'center',paddingVertical:30}, xp:{backgroundColor:'#26304b',flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, xpNum:{color:C.gold,fontWeight:'900',fontSize:25,marginTop:3}, xpSmall:{fontSize:13,color:C.muted}, module:{gap:0}, moduleDot:{height:31,width:31,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,marginRight:11}, moduleDetail:{borderTopWidth:1,borderColor:C.line,marginTop:14,paddingTop:12,gap:7}, moduleCopy:{color:C.warm,lineHeight:20,fontSize:14,fontWeight:'700'}, step:{color:C.muted,fontSize:13}, calmTab:{flex:1}, hidden:{display:'none'}, playerCard:{alignItems:'center',paddingVertical:20,gap:8}, breathGuide:{height:220,width:220,alignSelf:'center',alignItems:'center',justifyContent:'center',marginVertical:8}, breathGuideOuter:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:2,borderColor:'rgba(93,224,166,.58)'}, breathGuideInner:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:1,borderColor:'rgba(117,184,255,.7)'}, breathGuideCenter:{alignItems:'center',gap:4}, breathGlow:{position:'absolute',width:200,height:200,borderRadius:100,backgroundColor:'rgba(93,224,166,.16)'}, breathFill:{position:'absolute',width:190,height:190,borderRadius:95,backgroundColor:'rgba(93,224,166,.22)'}, waveRipple:{position:'absolute',width:170,height:170,borderRadius:85,borderWidth:2,borderColor:C.blue}, breathPhase:{color:C.warm,fontSize:20,fontWeight:'900',marginTop:5}, breathCount:{color:C.muted,fontSize:12,textAlign:'center'}, timer:{color:C.warm,fontSize:38,fontWeight:'900',letterSpacing:1}, playButton:{alignSelf:'stretch',backgroundColor:C.mint,paddingVertical:13,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:9}, playText:{color:C.ink,fontSize:15,fontWeight:'900'}, sessionRow:{flexDirection:'row',gap:9}, session:{flex:1,paddingVertical:12,alignItems:'center',borderWidth:1,borderColor:C.line,borderRadius:12,backgroundColor:C.raised}, sessionActive:{backgroundColor:C.mint,borderColor:C.mint}, sessionText:{color:C.muted,fontWeight:'800'}, sessionTextActive:{color:C.ink}, visualRow:{flexDirection:'row',gap:8}, visualChoice:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,paddingVertical:10,borderRadius:11,borderWidth:1,borderColor:C.line,backgroundColor:C.raised}, visualChoiceActive:{backgroundColor:C.mint,borderColor:C.mint}, visualText:{color:C.muted,fontSize:12,fontWeight:'800'}, visualTextActive:{color:C.ink}, soundscapePicker:{flexDirection:'row',alignItems:'center',gap:10,padding:14,backgroundColor:C.raised,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapePickerText:{flex:1,color:C.warm,fontSize:14,fontWeight:'700'}, soundscapeRow:{flexDirection:'row',alignItems:'center',gap:12,padding:14,backgroundColor:C.surface,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapeRowActive:{backgroundColor:C.mint,borderColor:C.mint}, compose:{backgroundColor:C.mint,padding:14,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, composeText:{fontSize:14,color:C.ink,fontWeight:'900'}, postHead:{flexDirection:'row',alignItems:'center',gap:10}, avatar:{height:35,width:35,borderRadius:12,backgroundColor:'#476686',alignItems:'center',justifyContent:'center'}, avatarText:{color:C.warm,fontWeight:'900'}, avatarImg:{height:35,width:35,borderRadius:12,backgroundColor:C.raised}, memberAvatarImg:{height:57,width:57,borderRadius:18,backgroundColor:C.raised}, postText:{color:C.warm,fontSize:15,lineHeight:22}, profile:{flexDirection:'row',alignItems:'center'}, bigAvatar:{width:56,height:56,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, bigAvatarText:{color:C.ink,fontSize:22,fontWeight:'900'}, achievement:{flexDirection:'row',alignItems:'center',gap:12,padding:14,borderWidth:1,borderColor:'#66583d',borderRadius:16}, setting:{flexDirection:'row',alignItems:'center',paddingVertical:11,borderBottomWidth:1,borderColor:C.line,gap:12}, modalBack:{flex:1,backgroundColor:'rgba(5,9,16,.7)',justifyContent:'flex-end'}, sheet:{backgroundColor:'#223047',padding:22,paddingBottom:35,borderTopLeftRadius:26,borderTopRightRadius:26,gap:13}, handle:{width:40,height:4,backgroundColor:C.muted,borderRadius:4,alignSelf:'center',opacity:.5}, sheetTitle:{color:C.warm,fontSize:22,fontWeight:'900'}, sheetCopy:{color:C.muted,lineHeight:21,fontSize:14}, composeInput:{color:C.warm,minHeight:105,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,textAlignVertical:'top',fontSize:15}, toast:{position:'absolute',left:20,right:20,bottom:84,backgroundColor:'#263a44',padding:13,borderRadius:13,flexDirection:'row',alignItems:'center',gap:8,borderWidth:1,borderColor:'#478f72'}, toastText:{color:C.warm,fontSize:13,fontWeight:'700',flex:1},
+  badgeDot:{position:'absolute',top:6,right:6,width:9,height:9,borderRadius:5,backgroundColor:'#FF4D4D',borderWidth:1.5,borderColor:C.ink}, dmRow:{flexDirection:'row',alignItems:'center',gap:12,padding:13,backgroundColor:C.surface,borderWidth:1,borderColor:C.line,borderRadius:14}, dmDot:{width:9,height:9,borderRadius:5,backgroundColor:C.mint}, dmPreviewRow:{flexDirection:'row',alignItems:'center',gap:10}, dmPreviewAvatar:{height:40,width:40,borderRadius:14,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, bellDivider:{height:1,backgroundColor:C.line,marginVertical:2},
   onboardSafe:{flex:1,backgroundColor:C.ink}, onboardStar:{height:180,alignItems:'center',justifyContent:'center',backgroundColor:'#173047',borderBottomRightRadius:95,borderBottomLeftRadius:35}, welcomeBody:{padding:28,gap:15}, welcomeTitle:{color:C.warm,fontSize:38,fontWeight:'900',lineHeight:44,letterSpacing:-1}, welcomeCopy:{color:C.muted,fontSize:16,lineHeight:25,maxWidth:310}, welcomeBottom:{padding:24,gap:20,marginTop:'auto'}, textButton:{alignItems:'center',justifyContent:'center',flexDirection:'row',gap:6,padding:8}, textButtonLabel:{color:C.mint,fontSize:14,fontWeight:'800'}, onboardScroll:{padding:24,paddingTop:32,gap:17,paddingBottom:45}, onboardKicker:{color:C.mint,fontSize:11,fontWeight:'900',letterSpacing:1.5,marginTop:8}, onboardTitle:{color:C.warm,fontSize:32,lineHeight:38,fontWeight:'900',letterSpacing:-.7}, onboardCopy:{color:C.muted,fontSize:15,lineHeight:23,marginBottom:5}, field:{gap:6}, fieldLabel:{color:C.muted,fontSize:10,fontWeight:'900',letterSpacing:1}, fieldInput:{borderBottomWidth:1,borderColor:C.line,color:C.warm,paddingVertical:12,fontSize:16}, bioInput:{minHeight:82,textAlignVertical:'top',borderWidth:1,borderRadius:12,paddingHorizontal:12}, choiceWrap:{flexDirection:'row',flexWrap:'wrap',gap:8}, choice:{paddingVertical:10,paddingHorizontal:12,borderWidth:1,borderColor:C.line,borderRadius:10,flexDirection:'row',gap:6,alignItems:'center'}, choiceActive:{backgroundColor:C.mint,borderColor:C.mint}, choiceText:{color:C.muted,fontSize:13,fontWeight:'800'}, choiceTextActive:{color:C.ink}, statusNote:{color:C.gold,fontSize:13,lineHeight:19,backgroundColor:'#312b20',padding:12,borderRadius:10}, skip:{alignItems:'center',padding:7}, preferenceNote:{flexDirection:'row',gap:8,alignItems:'center',padding:10,backgroundColor:'#163636',borderWidth:1,borderColor:'#326d60',borderRadius:11}, preferenceText:{color:C.warm,fontSize:12,flex:1,lineHeight:17}, privacyAction:{flexDirection:'row',alignItems:'center',gap:12,padding:14,borderWidth:1,borderColor:C.line,borderRadius:15}, photoRow:{flexDirection:'row',alignItems:'center',gap:14,padding:14,backgroundColor:C.raised,borderRadius:14,borderWidth:1,borderColor:C.line}, journalScroll:{backgroundColor:'#151d2b'}, journalNew:{backgroundColor:C.mint,padding:14,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, journalEmpty:{minHeight:220,justifyContent:'center',alignItems:'center',gap:12,borderTopWidth:1,borderBottomWidth:1,borderColor:'#4d4a40',paddingHorizontal:36}, journalEntry:{backgroundColor:'#20263a',padding:18,gap:11,borderLeftWidth:2,borderColor:C.gold}, journalMood:{color:C.gold,fontSize:12,fontWeight:'800'}, journalBody:{color:C.warm,fontSize:16,lineHeight:25}, journalSheet:{backgroundColor:'#252b3a'}, moodRow:{flexDirection:'row',gap:7,flexWrap:'wrap'}, journalInput:{minHeight:190,color:C.warm,fontSize:17,lineHeight:26,textAlignVertical:'top',paddingVertical:10,borderBottomWidth:1,borderColor:'#665f4f'},
   splashSafe:{flex:1,backgroundColor:'#0b1420'}, splashBg:{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'#0b1420'}, splashBgAccent:{position:'absolute',top:'-20%',left:'-10%',right:'-10%',height:'70%',borderRadius:500,backgroundColor:'#112040',opacity:.7}, splashContent:{flex:1,alignItems:'center',justifyContent:'center',gap:14,paddingHorizontal:32}, splashStar:{position:'absolute',width:3,height:3,borderRadius:2,backgroundColor:C.warm}, splashLogoWrap:{height:130,width:130,alignItems:'center',justifyContent:'center',marginBottom:4}, splashRing:{position:'absolute',width:130,height:130,borderRadius:65,borderWidth:2,borderColor:C.mint}, splashIconOuter:{alignItems:'center',justifyContent:'center'}, splashIconBg:{position:'absolute',width:72,height:72,borderRadius:36,backgroundColor:'rgba(93,224,166,0.12)'}, splashIcon:{fontSize:44,textShadowColor:C.mint,textShadowRadius:18}, splashBrand:{color:C.warm,fontSize:22,fontWeight:'900',letterSpacing:4,marginTop:2}, splashTagline:{color:C.muted,fontSize:13,textAlign:'center',letterSpacing:.4}, splashMsgWrap:{borderTopWidth:1,borderColor:'#1f3050',paddingTop:20,alignItems:'center',minHeight:68,justifyContent:'center'}, splashMsg:{color:C.warm,fontSize:17,lineHeight:26,textAlign:'center',fontStyle:'italic',fontWeight:'600',letterSpacing:.2}, splashDots:{flexDirection:'row',gap:8,marginTop:10}, splashDot:{width:7,height:7,borderRadius:4,backgroundColor:C.mint},
   readingsEntry:{flexDirection:'row',alignItems:'center',gap:13,padding:14,backgroundColor:C.surface,borderRadius:16,borderWidth:1,borderColor:'rgba(93,224,166,.3)'},
