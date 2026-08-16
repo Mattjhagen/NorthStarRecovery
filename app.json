@@ -45,6 +45,12 @@
         {
           "locationWhenInUsePermission": "Northstar uses your location to sort meetings by distance and, if you opt in, to send and receive nearby SOS support alerts. Only a coarse, city-level location is ever stored."
         }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Northstar uses your contacts only to help you text an invite to friends you choose. Your contacts are never uploaded or shared."
+        }
       ]
     ],
     "ios": {

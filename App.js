@@ -12,6 +12,7 @@ import * as Location from 'expo-location';
 import * as Application from 'expo-application';
 import * as Clipboard from 'expo-clipboard';
 import * as SecureStore from 'expo-secure-store';
+import * as Contacts from 'expo-contacts';
 import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, cancelMeetingReminders, sendLocalNotification, getRemotePushToken } from './notifications';
 import { READINGS } from './readings';
 import { createAccount, confirmAccount, signInWithPassword, restoreSignedInUser, signOutEverywhere } from './auth';
@@ -307,6 +308,9 @@ function AppInner() {
   const [learnComplete, setLearnComplete] = useState(1);
   useEffect(()=>{ SecureStore.getItemAsync('northstar.learn-complete').then(v=>{ const n=parseInt(v,10); if(Number.isFinite(n)&&n>1) setLearnComplete(n); }).catch(()=>{}); },[]);
   const advanceLearn = id => { setLearnComplete(id); SecureStore.setItemAsync('northstar.learn-complete', String(id)).catch(()=>{}); };
+  const [inviteXP, setInviteXP] = useState(0);
+  useEffect(()=>{ SecureStore.getItemAsync('northstar.invite-xp').then(v=>{ const n=parseInt(v,10); if(Number.isFinite(n)&&n>0) setInviteXP(n); }).catch(()=>{}); },[]);
+  const earnInviteXP = () => setInviteXP(prev => { const next = Math.min(prev + 10, 200); SecureStore.setItemAsync('northstar.invite-xp', String(next)).catch(()=>{}); return next; });
   useEffect(() => { restoreSignedInUser().then(u => setAuthState(u ? 'authenticated' : 'onboarding')).catch(() => setAuthState('onboarding')); }, []);
   useEffect(() => {
     if (authState !== 'authenticated') return;
@@ -456,12 +460,12 @@ function AppInner() {
       <View style={styles.body}>
         {tab==='Today'    && <Today say={say} go={setTab} profile={profile} sobrietyDays={sobrietyDays} meetings={meetings} sosEnabled={sosEnabled}/>}
         {tab==='Meetings' && <Meetings say={say} profile={profile} meetings={meetings} loading={!cmaLoaded}/>}
-        {tab==='Learn'    && <Learn say={say} onReadings={()=>setReadingsOpen(true)} news={recoveryNews} complete={learnComplete} onComplete={advanceLearn}/>}
+        {tab==='Learn'    && <Learn say={say} onReadings={()=>setReadingsOpen(true)} news={recoveryNews} complete={learnComplete} onComplete={advanceLearn} inviteXP={inviteXP}/>}
         <View style={[styles.calmTab, tab!=='Calm'&&styles.hidden]}>
           <Calm player={calmPlayer} soundscape={currentSoundscape} soundscapes={SOUNDSCAPES} onSelectSoundscape={setCurrentSoundscape}/>
         </View>
         {tab==='Connect'  && <Connect say={say}/>}
-        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={authEmail.toLowerCase()==='matty@purepulse.one'} sosEnabled={sosEnabled} onToggleSos={toggleSos}/>}
+        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={authEmail.toLowerCase()==='matty@purepulse.one'} sosEnabled={sosEnabled} onToggleSos={toggleSos} onInviteSent={earnInviteXP}/>}
         {tab==='Journal'  && <Journal say={say} entries={journalEntries} onAdd={addJournalEntry}/>}
       </View>
       <View style={styles.tabbar}>
@@ -889,9 +893,9 @@ function Meetings({ say, profile, meetings, loading }) {
 }
 
 // ─── LEARN ────────────────────────────────────────────────────────────────────
-function Learn({ say, onReadings, news, complete, onComplete }) {
+function Learn({ say, onReadings, news, complete, onComplete, inviteXP=0 }) {
   const [open, setOpen] = useState(1);
-  const totalXP = LEARN_MODULES.slice(0,complete).reduce((s,m)=>s+m.xp,0);
+  const totalXP = LEARN_MODULES.slice(0,complete).reduce((s,m)=>s+m.xp,0) + inviteXP;
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <Text style={styles.h1}>Learn by living it</Text>
@@ -905,7 +909,7 @@ function Learn({ say, onReadings, news, complete, onComplete }) {
         <Icon name="chevron-forward" color={C.muted}/>
       </Pressable>
       <Card style={styles.xp}>
-        <View><Text style={styles.mini}>YOUR NORTHSTAR PATH</Text><Text style={styles.xpNum}>{totalXP} XP <Text style={styles.xpSmall}>earned</Text></Text><Text style={styles.muted}>{complete} of {LEARN_MODULES.length} modules complete</Text></View>
+        <View><Text style={styles.mini}>YOUR NORTHSTAR PATH</Text><Text style={styles.xpNum}>{totalXP} XP <Text style={styles.xpSmall}>earned</Text></Text><Text style={styles.muted}>{complete} of {LEARN_MODULES.length} modules complete{inviteXP>0?` · ${inviteXP} XP from invites`:''}</Text></View>
         <Icon name="sparkles" size={32} color={C.gold}/>
       </Card>
       {LEARN_MODULES.map((m,i)=>{
@@ -1465,8 +1469,23 @@ function SupportNorthstar({ say }) {
 }
 
 // ─── YOU ──────────────────────────────────────────────────────────────────────
-function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries, saveProfile, isAdmin, sosEnabled, onToggleSos }) {
+function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries, saveProfile, isAdmin, sosEnabled, onToggleSos, onInviteSent }) {
   const [adminOpen, setAdminOpen] = useState(false);
+  const [contactsOpen, setContactsOpen] = useState(false);
+  const [contacts, setContacts] = useState([]);
+  const [contactQuery, setContactQuery] = useState('');
+  const openContacts = async () => {
+    const { status } = await Contacts.requestPermissionsAsync();
+    if (status !== 'granted') { say('Allow contact access in Settings to invite friends.'); return; }
+    const { data } = await Contacts.getContactsAsync({ fields: [Contacts.Fields.PhoneNumbers], sort: Contacts.SortTypes.FirstName });
+    setContacts((data||[]).filter(c=>c.phoneNumbers?.length));
+    setContactsOpen(true);
+  };
+  const inviteContact = c => {
+    const phone = c.phoneNumbers[0].number.replace(/[^+\d]/g,'');
+    const msg = encodeURIComponent("I'm using Northstar Recovery on my sobriety journey. It's gentle and private — join me: https://cmameet.site");
+    Linking.openURL(`sms:${phone}${Platform.OS==='ios'?'&':'?'}body=${msg}`).then(()=>{ onInviteSent(); say('+10 XP — thank you for sharing Northstar.'); }).catch(()=>say('Could not open Messages.'));
+  };
   const toggleSponsorAvailable = val => {
     saveProfile({ ...profile, sponsorAvailable: val });
     say(val?'You are listed as an available sponsor.':'You are no longer listed as a sponsor.');
@@ -1606,10 +1625,32 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
 
       <Text style={styles.sectionTitle}>YOUR NETWORK</Text>
       <Card>
-        <Text style={styles.mini}>INVITE A FRIEND</Text>
-        <Text style={styles.muted}>Share Northstar with someone in your recovery network.</Text>
-        <Button label="Invite a friend" onPress={inviteFriend} icon="person-add-outline"/>
+        <Text style={styles.mini}>INVITE A FRIEND · EARN XP</Text>
+        <Text style={styles.muted}>Share Northstar with someone in your recovery network. Each invite earns 10 XP on your Northstar Path. Contacts stay on your device — never uploaded.</Text>
+        <Button label="Invite from contacts" onPress={openContacts} icon="people-outline"/>
+        <Button label="Share invite link" onPress={()=>{inviteFriend();onInviteSent();}} icon="person-add-outline" kind="dark"/>
       </Card>
+      <Modal visible={contactsOpen} animationType="slide">
+        <SafeAreaView style={[styles.safe,{backgroundColor:'#141f31'}]}>
+          <View style={[styles.header,{height:60}]}>
+            <Text style={styles.sheetTitle}>Invite friends</Text>
+            <Pressable onPress={()=>setContactsOpen(false)}><Icon name="close" color={C.warm}/></Pressable>
+          </View>
+          <View style={[styles.search,{marginHorizontal:16,marginBottom:8}]}>
+            <Icon name="search" size={16} color={C.muted}/>
+            <TextInput value={contactQuery} onChangeText={setContactQuery} placeholder="Search contacts…" placeholderTextColor={C.muted} style={styles.input}/>
+          </View>
+          <ScrollView contentContainerStyle={{padding:16,paddingTop:0,gap:8}}>
+            {contacts.filter(c=>(c.name||'').toLowerCase().includes(contactQuery.toLowerCase())).slice(0,200).map(c=>(
+              <Pressable key={c.id} onPress={()=>inviteContact(c)} style={styles.soundscapeRow}>
+                <View style={styles.avatar}><Text style={styles.avatarText}>{(c.name||'?').charAt(0).toUpperCase()}</Text></View>
+                <View style={{flex:1}}><Text style={styles.cardTitle}>{c.name||'Unknown'}</Text><Text style={styles.muted}>{c.phoneNumbers[0].number}</Text></View>
+                <Icon name="chatbubble-outline" size={17} color={C.mint}/>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
 
       <Text style={styles.sectionTitle}>SUPPORT NORTHSTAR</Text>
       <SupportNorthstar say={say}/>
