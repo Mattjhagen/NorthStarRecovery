@@ -11,6 +11,7 @@ import * as QuickActions from 'expo-quick-actions';
 import * as Location from 'expo-location';
 import * as Application from 'expo-application';
 import * as Clipboard from 'expo-clipboard';
+import * as SecureStore from 'expo-secure-store';
 import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, cancelMeetingReminders, sendLocalNotification, getRemotePushToken } from './notifications';
 import { READINGS } from './readings';
 import { createAccount, confirmAccount, signInWithPassword, restoreSignedInUser, signOutEverywhere } from './auth';
@@ -303,6 +304,9 @@ function AppInner() {
 
   const [authEmail, setAuthEmail] = useState('');
   const [sosEnabled, setSosEnabled] = useState(false);
+  const [learnComplete, setLearnComplete] = useState(1);
+  useEffect(()=>{ SecureStore.getItemAsync('northstar.learn-complete').then(v=>{ const n=parseInt(v,10); if(Number.isFinite(n)&&n>1) setLearnComplete(n); }).catch(()=>{}); },[]);
+  const advanceLearn = id => { setLearnComplete(id); SecureStore.setItemAsync('northstar.learn-complete', String(id)).catch(()=>{}); };
   useEffect(() => { restoreSignedInUser().then(u => setAuthState(u ? 'authenticated' : 'onboarding')).catch(() => setAuthState('onboarding')); }, []);
   useEffect(() => {
     if (authState !== 'authenticated') return;
@@ -452,7 +456,7 @@ function AppInner() {
       <View style={styles.body}>
         {tab==='Today'    && <Today say={say} go={setTab} profile={profile} sobrietyDays={sobrietyDays} meetings={meetings} sosEnabled={sosEnabled}/>}
         {tab==='Meetings' && <Meetings say={say} profile={profile} meetings={meetings} loading={!cmaLoaded}/>}
-        {tab==='Learn'    && <Learn say={say} onReadings={()=>setReadingsOpen(true)} news={recoveryNews}/>}
+        {tab==='Learn'    && <Learn say={say} onReadings={()=>setReadingsOpen(true)} news={recoveryNews} complete={learnComplete} onComplete={advanceLearn}/>}
         <View style={[styles.calmTab, tab!=='Calm'&&styles.hidden]}>
           <Calm player={calmPlayer} soundscape={currentSoundscape} soundscapes={SOUNDSCAPES} onSelectSoundscape={setCurrentSoundscape}/>
         </View>
@@ -885,8 +889,7 @@ function Meetings({ say, profile, meetings, loading }) {
 }
 
 // ─── LEARN ────────────────────────────────────────────────────────────────────
-function Learn({ say, onReadings, news }) {
-  const [complete, setComplete] = useState(1);
+function Learn({ say, onReadings, news, complete, onComplete }) {
   const [open, setOpen] = useState(1);
   const totalXP = LEARN_MODULES.slice(0,complete).reduce((s,m)=>s+m.xp,0);
   return (
@@ -927,7 +930,7 @@ function Learn({ say, onReadings, news }) {
               {m.steps.map(s=><Text key={s} style={styles.step}>• {s}</Text>)}
               {locked
                 ? <Text style={[styles.muted,{fontStyle:'italic'}]}>Finish the earlier modules to complete this one — reading ahead is always okay.</Text>
-                : <Button label={done?'Review module':'Complete module'} onPress={()=>{if(!done)setComplete(m.id);say(done?'Module opened for review':`${m.title} complete — ${m.xp} XP earned`);}} icon={done?'refresh':'checkmark'}/>}
+                : <Button label={done?'Review module':'Complete module'} onPress={()=>{if(!done)onComplete(m.id);say(done?'Module opened for review':`${m.title} complete — ${m.xp} XP earned`);}} icon={done?'refresh':'checkmark'}/>}
             </View>}
           </Card>
         );
