@@ -1641,7 +1641,8 @@ function ReadingsLibrary({ onClose }) {
       <ScrollView contentContainerStyle={[styles.scroll,{paddingTop:8}]}>
         <Text style={styles.intro}>Official CMA pamphlets — listen along or open the full PDF.</Text>
         {READINGS.map(r=>(
-          <Pressable key={r.id} onPress={()=>setSelected(r)} style={[styles.readingCard, selected?.id===r.id&&styles.readingCardActive]}>
+          <React.Fragment key={r.id}>
+          <Pressable onPress={()=>setSelected(selected?.id===r.id?null:r)} style={[styles.readingCard, selected?.id===r.id&&styles.readingCardActive]}>
             <View style={[styles.readingIcon,selected?.id===r.id&&{backgroundColor:C.ink}]}>
               <Icon name={r.icon} size={20} color={selected?.id===r.id?C.mint:C.ink}/>
             </View>
@@ -1651,8 +1652,9 @@ function ReadingsLibrary({ onClose }) {
             </View>
             <Icon name={selected?.id===r.id?'chevron-down':'chevron-forward'} size={16} color={selected?.id===r.id?C.ink:C.muted}/>
           </Pressable>
+          {selected?.id===r.id&&<ReadingPlayer reading={selected} onClose={()=>setSelected(null)}/>}
+          </React.Fragment>
         ))}
-        {selected&&<ReadingPlayer reading={selected} onClose={()=>setSelected(null)}/>}
         <Card style={{marginTop:4}}>
           <Text style={styles.mini}>FULL LITERATURE LIBRARY</Text>
           <Text style={styles.muted}>More pamphlets and workbooks are available on the official CMA website.</Text>
