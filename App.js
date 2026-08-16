@@ -244,7 +244,7 @@ function AppInner() {
   const calmPlayer = useAudioPlayer(soundscapeUri(currentSoundscape.name));
 
   useEffect(() => { restoreSignedInUser().then(u => setAuthState(u ? 'authenticated' : 'onboarding')).catch(() => setAuthState('onboarding')); }, []);
-  useEffect(() => { setAudioModeAsync({ playsInSilentModeIOS:true, staysActiveInBackground:true, interruptionModeIOS:'duckOthers', shouldDuckAndroid:true }); }, []);
+  useEffect(() => { setAudioModeAsync({ playsInSilentMode:true, shouldPlayInBackground:true, interruptionMode:'duckOthers' }).catch(()=>{}); }, []);
   useEffect(() => { calmPlayer.loop = true; }, [calmPlayer]);
 
   useEffect(() => {
