@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Northstar Recovery",
-    "slug": "northstar-recovery",
+    "slug": "mattyjames",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
@@ -48,12 +48,17 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/northstar-app-icon.png",
         "backgroundColor": "#101827"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "extra": {
       "eas": {
-        "projectId": "d72ac8a6-9bd3-41c3-b4e4-55c04cc330f7"
+        "projectId": "e2814d89-03ca-4798-a753-a56b695364f5"
       }
-    }
+    },
+    "owner": "northstar-recovery"
   }
 }
