@@ -104,21 +104,32 @@ const FALLBACK_MEETINGS = [
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
+// The API reports meeting times in 24-hour format ("06:30"); the UI and
+// nextMeeting() both expect "6:30 AM".
+function to12Hour(time) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time || '');
+  if (!match) return time || '';
+  let h = parseInt(match[1], 10);
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${match[2]} ${suffix}`;
+}
+
 async function fetchCMAMeetings() {
   try {
-    const res = await fetch('https://www.crystalmeth.org/wp-json/meeting-guide/meetings', {
+    const res = await fetch('https://www.crystalmeth.org/wp-admin/admin-ajax.php?action=meetings', {
       headers: { Accept: 'application/json' },
     });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         return data
-          .filter(m => m.conference_url || m.types?.some(t => ['online','TC','VM'].includes(t)))
+          .filter(m => m.conference_url || m.types?.some(t => ['online', 'ONL', 'TC', 'VM'].includes(t)))
           .slice(0, 60)
           .map((m, i) => ({
             id: m.slug || `mg-${i}`,
             title: m.name,
-            time: m.time || '',
+            time: to12Hour(m.time),
             day: m.day !== undefined ? DAYS[m.day] : 'Daily',
             format: 'Remote',
             region: m.region || m.city || 'Online',
@@ -154,12 +165,13 @@ function nextMeeting(meetings) {
 
 async function fetchRecoveryNews() {
   try {
-    const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://nida.nih.gov/news-events/rss.xml')}&count=6`;
+    // rss2json rejects the `count` param without a paid API key; trim client-side instead.
+    const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://nida.nih.gov/rss.xml')}`;
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
     if (res.ok) {
       const data = await res.json();
       if (data.status === 'ok' && data.items?.length) {
-        return data.items.map(item => ({
+        return data.items.slice(0, 6).map(item => ({
           id: item.guid || item.link,
           title: item.title,
           summary: (item.description || item.content || '')
