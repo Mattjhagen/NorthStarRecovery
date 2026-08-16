@@ -36,7 +36,8 @@
         {
           "photosPermission": "Northstar Recovery uses your photo library so you can set an optional profile photo."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "ios": {
       "supportsTablet": true,

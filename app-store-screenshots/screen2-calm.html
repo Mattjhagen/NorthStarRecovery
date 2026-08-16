@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    width: 2048px; height: 2732px;
+    background: #101827;
+    font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    overflow: hidden;
+  }
+  .status-bar {
+    height: 60px; background: #101827;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 60px;
+  }
+  .status-time { color: #F4F1E8; font-size: 34px; font-weight: 700; }
+  .header {
+    background: #192438; padding: 32px 60px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #34445d;
+  }
+  .logo { display: flex; align-items: center; gap: 18px; }
+  .star { color: #5DE0A6; font-size: 52px; }
+  .logo-text { color: #F4F1E8; font-size: 42px; font-weight: 800; }
+  .icon-btn {
+    width: 72px; height: 72px; border-radius: 20px;
+    background: #233149; display: flex; align-items: center; justify-content: center;
+  }
+
+  .calm-hero {
+    background: linear-gradient(180deg, #141f31 0%, #0e1c2e 50%, #0a1622 100%);
+    padding: 80px 60px 60px;
+    display: flex; flex-direction: column; align-items: center;
+    position: relative; overflow: hidden;
+  }
+  .calm-title { color: #F4F1E8; font-size: 60px; font-weight: 800; margin-bottom: 8px; text-align: center; }
+  .calm-sub { color: #9DADC5; font-size: 32px; text-align: center; margin-bottom: 70px; }
+
+  /* Visual circle breathe animation */
+  .breath-stage {
+    width: 600px; height: 600px; position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ring-outer {
+    position: absolute;
+    width: 580px; height: 580px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(93,224,166,0.08) 0%, rgba(93,224,166,0.02) 70%, transparent 100%);
+    border: 2px solid rgba(93,224,166,0.15);
+  }
+  .ring-mid {
+    position: absolute;
+    width: 440px; height: 440px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(93,224,166,0.12) 0%, rgba(93,224,166,0.04) 70%, transparent 100%);
+    border: 1.5px solid rgba(93,224,166,0.25);
+  }
+  .ring-inner {
+    width: 300px; height: 300px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(93,224,166,0.22) 0%, rgba(93,224,166,0.08) 60%, transparent 100%);
+    border: 2px solid rgba(93,224,166,0.5);
+    display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+  }
+  .breath-icon { color: #5DE0A6; font-size: 60px; }
+  .breath-phase { color: #5DE0A6; font-size: 34px; font-weight: 700; }
+  .breath-count { color: #9DADC5; font-size: 28px; }
+
+  .content { padding: 50px 60px 0; display: flex; flex-direction: column; gap: 32px; }
+
+  .card {
+    background: #192438; border-radius: 28px; padding: 44px 52px;
+    border: 1px solid #34445d;
+  }
+
+  .now-playing {
+    display: flex; align-items: center; gap: 32px;
+  }
+  .play-btn {
+    width: 100px; height: 100px; border-radius: 30px;
+    background: #5DE0A6; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .play-info { flex: 1; }
+  .play-label { color: #9DADC5; font-size: 26px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+  .play-name { color: #F4F1E8; font-size: 48px; font-weight: 800; margin-bottom: 6px; }
+  .play-cat { color: #9DADC5; font-size: 30px; }
+  .play-arrow {
+    width: 60px; height: 60px; border-radius: 16px; background: #233149;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .progress-bar {
+    height: 8px; background: #34445d; border-radius: 4px; margin-top: 28px;
+    position: relative; overflow: hidden;
+  }
+  .progress-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 35%; background: linear-gradient(90deg, #5DE0A6, #75B8FF);
+    border-radius: 4px;
+  }
+
+  .visual-row { display: flex; gap: 20px; margin-top: 6px; }
+  .visual-choice {
+    flex: 1; border-radius: 18px; padding: 22px 0;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    border: 2px solid #34445d; background: transparent;
+  }
+  .visual-choice.active { background: #5DE0A6; border-color: #5DE0A6; }
+  .visual-choice-text { font-size: 26px; font-weight: 700; color: #9DADC5; }
+  .visual-choice.active .visual-choice-text { color: #101827; }
+
+  .breathe-btn {
+    background: #233149; border-radius: 20px; border: 1px solid #34445d;
+    padding: 30px 44px;
+    display: flex; align-items: center; gap: 18px;
+  }
+  .breathe-text { color: #F4F1E8; font-size: 32px; font-weight: 700; flex: 1; }
+
+  .headphone-card { display: flex; gap: 28px; align-items: center; }
+  .ear-icon { flex-shrink: 0; }
+  .card-title { color: #F4F1E8; font-size: 36px; font-weight: 800; margin-bottom: 8px; }
+  .card-muted { color: #9DADC5; font-size: 28px; line-height: 1.5; }
+
+  .tab-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: #192438; border-top: 1px solid #34445d;
+    display: flex; height: 120px; padding-bottom: 20px;
+  }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+  .tab-text { font-size: 22px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="status-bar">
+  <div class="status-time">9:41</div>
+  <div style="display:flex;align-items:center;gap:20px;">
+    <svg width="40" height="28" viewBox="0 0 40 28" fill="none">
+      <rect x="1" y="7" width="6" height="14" rx="1.5" fill="#F4F1E8"/>
+      <rect x="10" y="4" width="6" height="17" rx="1.5" fill="#F4F1E8"/>
+      <rect x="19" y="1" width="6" height="20" rx="1.5" fill="#F4F1E8"/>
+      <rect x="28" y="1" width="9" height="20" rx="1.5" fill="#F4F1E8" opacity="0.3"/>
+    </svg>
+    <div style="background:#2a3f5a;border-radius:12px;padding:8px 18px;">
+      <span style="color:#5DE0A6;font-size:26px;font-weight:700;">85%</span>
+    </div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="logo">
+    <div class="star">✦</div>
+    <div class="logo-text">Calm</div>
+  </div>
+  <div class="icon-btn">
+    <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#F4F1E8" stroke-width="2" stroke-linecap="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  </div>
+</div>
+
+<!-- Calm Hero with Breathing Circle -->
+<div class="calm-hero">
+  <div class="calm-title">Calm your mind</div>
+  <div class="calm-sub">Breathe, listen, let go.</div>
+
+  <!-- Stars scattered -->
+  <div style="position:absolute;top:50px;left:120px;color:rgba(93,224,166,0.3);font-size:28px;">✦</div>
+  <div style="position:absolute;top:110px;right:200px;color:rgba(117,184,255,0.25);font-size:20px;">✦</div>
+  <div style="position:absolute;bottom:120px;left:180px;color:rgba(93,224,166,0.2);font-size:16px;">✦</div>
+  <div style="position:absolute;bottom:80px;right:160px;color:rgba(245,185,93,0.25);font-size:22px;">✦</div>
+
+  <div class="breath-stage">
+    <div class="ring-outer"></div>
+    <div class="ring-mid"></div>
+    <div class="ring-inner">
+      <div style="font-size:64px;">🌿</div>
+      <div class="breath-phase">Breathe in</div>
+      <div class="breath-count">4 seconds</div>
+    </div>
+  </div>
+</div>
+
+<!-- Content -->
+<div class="content">
+
+  <!-- Now Playing -->
+  <div class="card">
+    <div class="now-playing">
+      <div class="play-btn">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="#101827">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+      </div>
+      <div class="play-info">
+        <div class="play-label">Now playing</div>
+        <div class="play-name">Forest Rain</div>
+        <div class="play-cat">Nature · Binaural</div>
+      </div>
+      <div class="play-arrow">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2.5" stroke-linecap="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill"></div>
+    </div>
+
+    <!-- Visual Row -->
+    <div class="visual-row" style="margin-top:36px;">
+      <div class="visual-choice active">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#101827" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="9"/>
+        </svg>
+        <div class="visual-choice-text" style="color:#101827;">Breath</div>
+      </div>
+      <div class="visual-choice">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+        <div class="visual-choice-text">Night</div>
+      </div>
+      <div class="visual-choice">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+          <path d="M3 12h18M3 6h18M3 18h18"/><path d="M7 12c0-2.5 2-5 5-5s5 2.5 5 5-2-5-5-5-5 2.5-5 5z"/>
+        </svg>
+        <div class="visual-choice-text">Waves</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Circle Breathing CTA -->
+  <div class="breathe-btn">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2" stroke-linecap="round">
+      <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+      <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+    </svg>
+    <div class="breathe-text">Try circle breathing</div>
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  </div>
+
+  <!-- Headphone tip -->
+  <div class="card">
+    <div class="headphone-card">
+      <div class="ear-icon">
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#F5B95D" stroke-width="2" stroke-linecap="round">
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="card-title">Best with headphones</div>
+        <div class="card-muted">Binaural audio uses subtle differences between channels. Keep the volume comfortable.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+    </svg>
+    <div class="tab-text" style="color:#9DADC5;">Today</div>
+  </div>
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+    </svg>
+    <div class="tab-text" style="color:#9DADC5;">Meetings</div>
+  </div>
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </svg>
+    <div class="tab-text" style="color:#9DADC5;">Learn</div>
+  </div>
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+    <div class="tab-text" style="color:#9DADC5;">Connect</div>
+  </div>
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2" stroke-linecap="round">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+    </svg>
+    <div class="tab-text" style="color:#5DE0A6;">Calm</div>
+  </div>
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+    </svg>
+    <div class="tab-text" style="color:#9DADC5;">You</div>
+  </div>
+</div>
+
+</body>
+</html>

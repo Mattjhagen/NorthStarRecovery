@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
+import * as WebBrowser from 'expo-web-browser';
+import * as Haptics from 'expo-haptics';
 import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, cancelMeetingReminders, sendLocalNotification, getRemotePushToken } from './notifications';
 import { READINGS } from './readings';
 import { createAccount, confirmAccount, signInWithPassword, restoreSignedInUser, signOutEverywhere } from './auth';
@@ -94,12 +96,12 @@ const LEARN_MODULES = [
 ];
 
 const FALLBACK_MEETINGS = [
-  { id:'f1', title:'Morning Serenity', time:'8:00 AM', day:'Daily', format:'Remote', region:'Online Â· Worldwide', language:'English', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
-  { id:'f2', title:'The Next Right Thing', time:'12:00 PM', day:'Daily', format:'Remote', region:'Online Â· Worldwide', language:'English', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
-  { id:'f3', title:'A New Direction', time:'6:15 PM', day:'Mon/Wed/Fri', format:'Remote', region:'Online Â· Central', language:'English', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
-  { id:'f4', title:'Night Lanterns', time:'7:00 PM', day:'Daily', format:'Remote', region:'Online Â· Eastern', language:'English', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
-  { id:'f5', title:'Open Sky', time:'8:00 PM', day:'Daily', format:'Remote', region:'Online Â· Pacific', language:'English / EspaÃ±ol', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
-  { id:'f6', title:'Day by Day', time:'9:00 PM', day:'Daily', format:'Remote', region:'Online Â· Mountain', language:'English', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
+  { id:'f1', title:'Morning Serenity', time:'8:00 AM', day:'Daily', format:'Remote', region:'Online · Worldwide', language:'English', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
+  { id:'f2', title:'The Next Right Thing', time:'12:00 PM', day:'Daily', format:'Remote', region:'Online · Worldwide', language:'English', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
+  { id:'f3', title:'A New Direction', time:'6:15 PM', day:'Mon/Wed/Fri', format:'Remote', region:'Online · Central', language:'English', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
+  { id:'f4', title:'Night Lanterns', time:'7:00 PM', day:'Daily', format:'Remote', region:'Online · Eastern', language:'English', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
+  { id:'f5', title:'Open Sky', time:'8:00 PM', day:'Daily', format:'Remote', region:'Online · Pacific', language:'English / Español', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
+  { id:'f6', title:'Day by Day', time:'9:00 PM', day:'Daily', format:'Remote', region:'Online · Mountain', language:'English', url:'https://www.crystalmeth.org/meetings/?type=online', action:'Join meeting' },
 ];
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -202,6 +204,28 @@ function Button({ label, onPress, kind='mint', icon }) {
   </Pressable>;
 }
 function Card({ children, style }) { return <View style={[styles.card,style]}>{children}</View>; }
+// Web links open in an in-app browser sheet so members stay inside the app.
+function openWeb(url) {
+  WebBrowser.openBrowserAsync(url, { presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET })
+    .catch(() => Linking.openURL(url));
+}
+
+// Auto-format a US phone number as (555) 123-4567 while typing.
+function formatPhoneInput(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0,3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+}
+
+// Auto-insert slashes while typing a MM/DD/YYYY date (also accepts deletes).
+function formatDateInput(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0,2)}/${digits.slice(2)}`;
+  return `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+}
+
 function Field({ label, value, onChange, placeholder, secure=false, autoCapitalize='none' }) {
   return <View style={styles.field}>
     <Text style={styles.fieldLabel}>{label}</Text>
@@ -386,7 +410,7 @@ function AppInner() {
   );
 }
 
-// â"€â"€â"€ SPLASH â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── SPLASH ──────────────────────────────────────────────────────────────────
 const SPLASH_MESSAGES = [
   'You are not alone in this.','Every step forward counts, no matter how small.',
   "Courage doesn't always roar. Sometimes it shows up quietly.",'Today is a new beginning.',
@@ -435,7 +459,7 @@ function SplashScreen() {
   );
 }
 
-// â"€â"€â"€ PROFILE EDITOR â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── PROFILE EDITOR ──────────────────────────────────────────────────────────
 function ProfileEditor({ profile, onSave, onCancel }) {
   const [draft, setDraft] = useState(profile);
   const pickPhoto = async () => {
@@ -452,25 +476,25 @@ function ProfileEditor({ profile, onSave, onCancel }) {
         <Text style={styles.onboardCopy}>Your pseudonym is what others may see — not your legal name. Recovery details stay private.</Text>
         <Pressable onPress={pickPhoto} style={styles.photoRow}>
           <Avatar photo={draft.photo} initial={(draft.pseudonym||'?').charAt(0).toUpperCase()} size={72} radius={22}/>
-          <View style={{flex:1}}><Text style={styles.cardTitle}>Profile photo</Text><Text style={styles.muted}>Optional Â· tap to choose from your library</Text></View>
+          <View style={{flex:1}}><Text style={styles.cardTitle}>Profile photo</Text><Text style={styles.muted}>Optional · tap to choose from your library</Text></View>
           <Icon name="camera-outline" color={C.mint}/>
         </Pressable>
         <Field label="PSEUDONYM (OPTIONAL)" value={draft.pseudonym} onChange={v=>setDraft(p=>({...p,pseudonym:v}))} placeholder="How should we know you?" autoCapitalize="words"/>
         <View style={styles.field}><Text style={styles.fieldLabel}>BIO (OPTIONAL)</Text><TextInput multiline value={draft.bio} onChangeText={v=>setDraft(p=>({...p,bio:v}))} placeholder="A few words, if you want." placeholderTextColor={C.muted} style={[styles.fieldInput,styles.bioInput]}/></View>
-        <Field label="DATE OF BIRTH (OPTIONAL)" value={draft.dob} onChange={v=>setDraft(p=>({...p,dob:v}))} placeholder="MM/DD/YYYY"/>
+        <Field label="DATE OF BIRTH (OPTIONAL)" value={draft.dob} onChange={v=>setDraft(p=>({...p,dob:formatDateInput(v)}))} placeholder="MM/DD/YYYY"/>
         <Text style={styles.fieldLabel}>GENDER (OPTIONAL)</Text>
         <View style={styles.choiceWrap}>{['Woman','Man','Nonbinary','Prefer not to say'].map(x=><Choice key={x} label={x} active={draft.gender===x} onPress={()=>setDraft(p=>({...p,gender:x}))}/>)}</View>
         <Text style={styles.fieldLabel}>GROUP PREFERENCE</Text>
         <View style={styles.choiceWrap}>{['Women-only','Men-only','All groups'].map(x=><Choice key={x} label={x} active={draft.groupPreference===x} onPress={()=>setDraft(p=>({...p,groupPreference:x}))}/>)}</View>
-        <Field label="SOBRIETY DATE (OPTIONAL)" value={draft.sobrietyDate} onChange={v=>setDraft(p=>({...p,sobrietyDate:v}))} placeholder="MM/DD/YYYY"/>
+        <Field label="SOBRIETY DATE (OPTIONAL)" value={draft.sobrietyDate} onChange={v=>setDraft(p=>({...p,sobrietyDate:formatDateInput(v)}))} placeholder="MM/DD/YYYY"/>
         <Text style={[styles.onboardKicker,{marginTop:8}]}>SPONSOR (OPTIONAL)</Text>
         <Text style={[styles.muted,{marginBottom:4}]}>Save your sponsor's info for one-tap support.</Text>
         <Field label="SPONSOR NAME" value={draft.sponsor?.name||''} onChange={v=>setDraft(p=>({...p,sponsor:{...p.sponsor,name:v}}))} placeholder="Their name" autoCapitalize="words"/>
-        <Field label="SPONSOR PHONE" value={draft.sponsor?.phone||''} onChange={v=>setDraft(p=>({...p,sponsor:{...p.sponsor,phone:v}}))} placeholder="+1 (555) 000-0000"/>
+        <Field label="SPONSOR PHONE" value={draft.sponsor?.phone||''} onChange={v=>setDraft(p=>({...p,sponsor:{...p.sponsor,phone:formatPhoneInput(v)}}))} placeholder="+1 (555) 000-0000"/>
         <Text style={[styles.onboardKicker,{marginTop:8}]}>TRUSTED PERSON (OPTIONAL)</Text>
         <Text style={[styles.muted,{marginBottom:4}]}>Someone who can check on you if they're concerned.</Text>
         <Field label="TRUSTED PERSON NAME" value={draft.trustedPerson?.name||''} onChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,name:v}}))} placeholder="Their name" autoCapitalize="words"/>
-        <Field label="TRUSTED PERSON PHONE" value={draft.trustedPerson?.phone||''} onChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,phone:v}}))} placeholder="+1 (555) 000-0000"/>
+        <Field label="TRUSTED PERSON PHONE" value={draft.trustedPerson?.phone||''} onChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,phone:formatPhoneInput(v)}}))} placeholder="+1 (555) 000-0000"/>
         <View style={[styles.setting,{borderBottomWidth:0,marginTop:4}]}>
           <View style={{flex:1}}><Text style={styles.cardTitle}>Allow trusted person access</Text><Text style={styles.muted}>They can see your check-in status.</Text></View>
           <Switch value={!!draft.trustedPerson?.enabled} onValueChange={v=>setDraft(p=>({...p,trustedPerson:{...p.trustedPerson,enabled:v}}))} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={draft.trustedPerson?.enabled?C.mint:C.muted}/>
@@ -482,7 +506,7 @@ function ProfileEditor({ profile, onSave, onCancel }) {
   );
 }
 
-// â"€â"€â"€ ONBOARDING â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── ONBOARDING ──────────────────────────────────────────────────────────────
 function Onboarding({ onComplete }) {
   const [mode, setMode] = useState('welcome');
   const [busy, setBusy] = useState(false);
@@ -541,7 +565,7 @@ function Onboarding({ onComplete }) {
       <Text style={styles.onboardKicker}>WELCOME TO NORTHSTAR</Text><Text style={styles.onboardTitle}>Tell us a little about you.</Text>
       <Text style={styles.onboardCopy}>All optional. Only your pseudonym may be visible to other members.</Text>
       <Field label="PSEUDONYM (OPTIONAL)" value={profile.pseudonym} onChange={v=>setProfile(p=>({...p,pseudonym:v}))} placeholder="How should we know you?" autoCapitalize="words"/>
-      <Field label="SOBRIETY DATE (OPTIONAL)" value={profile.sobrietyDate} onChange={v=>setProfile(p=>({...p,sobrietyDate:v}))} placeholder="MM/DD/YYYY"/>
+      <Field label="SOBRIETY DATE (OPTIONAL)" value={profile.sobrietyDate} onChange={v=>setProfile(p=>({...p,sobrietyDate:formatDateInput(v)}))} placeholder="MM/DD/YYYY"/>
       <Text style={styles.fieldLabel}>GROUP PREFERENCE</Text>
       <View style={styles.choiceWrap}>{['Women-only','Men-only','All groups'].map(x=><Choice key={x} label={x} active={profile.groupPreference===x} onPress={()=>setProfile(p=>({...p,groupPreference:x}))}/>)}</View>
       <Button label="Enter Northstar" onPress={complete} icon="sparkles"/>
@@ -562,7 +586,7 @@ function Onboarding({ onComplete }) {
   );
 }
 
-// â"€â"€â"€ TODAY â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── TODAY ────────────────────────────────────────────────────────────────────
 function Today({ say, go, profile, sobrietyDays, meetings }) {
   const name = profile.pseudonym || 'friend';
   const next = nextMeeting(meetings);
@@ -625,10 +649,10 @@ function Today({ say, go, profile, sobrietyDays, meetings }) {
       {next ? (
         <Card>
           <View style={styles.rowBetween}>
-            <View><Text style={styles.mini}>NEXT MEETING</Text><Text style={styles.cardTitle}>{next.title}</Text><Text style={styles.muted}>Remote Â· {next.time} Â· in {next.minsAway} min</Text></View>
+            <View><Text style={styles.mini}>NEXT MEETING</Text><Text style={styles.cardTitle}>{next.title}</Text><Text style={styles.muted}>Remote · {next.time} · in {next.minsAway} min</Text></View>
             <View style={styles.remote}><Icon name="videocam-outline" color={C.mint}/></View>
           </View>
-          <Button label="Join meeting" onPress={()=>Linking.openURL(next.url)} icon="videocam"/>
+          <Button label="Join meeting" onPress={()=>openWeb(next.url)} icon="videocam"/>
         </Card>
       ) : (
         <Card>
@@ -657,7 +681,7 @@ function Today({ say, go, profile, sobrietyDays, meetings }) {
   );
 }
 
-// â"€â"€â"€ MEETINGS â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── MEETINGS ─────────────────────────────────────────────────────────────────
 function Meetings({ say, profile, meetings, loading }) {
   const [filter, setFilter] = useState('All');
   const [query, setQuery] = useState('');
@@ -673,9 +697,9 @@ function Meetings({ say, profile, meetings, loading }) {
       'Your meeting room is ready',
       `Share this link with others to join your room:\nmeet.jit.si/northstar-${id}`,
       [
-        { text: 'Copy & Open', onPress: () => { Share.share({ message: `Join my Northstar Recovery meeting: ${url}`, title: 'Northstar Recovery Meeting' }); Linking.openURL(url); } },
+        { text: 'Copy & Open', onPress: () => { Share.share({ message: `Join my Northstar Recovery meeting: ${url}`, title: 'Northstar Recovery Meeting' }); openWeb(url); } },
         { text: 'Share link', onPress: () => Share.share({ message: `Join my Northstar Recovery meeting: ${url}` }) },
-        { text: 'Just open', onPress: () => Linking.openURL(url) },
+        { text: 'Just open', onPress: () => openWeb(url) },
       ]
     );
   };
@@ -700,8 +724,8 @@ function Meetings({ say, profile, meetings, loading }) {
         <Card style={{borderColor:C.mint,borderWidth:1.5}}>
           <Text style={styles.mini}>MEET NOW</Text>
           <Text style={styles.cardTitle}>{meetNow.title}</Text>
-          <Text style={styles.muted}>Starts in {meetNow.minsAway} min Â· {meetNow.region}</Text>
-          <Button label="Join now" onPress={()=>Linking.openURL(meetNow.url)} icon="videocam"/>
+          <Text style={styles.muted}>Starts in {meetNow.minsAway} min · {meetNow.region}</Text>
+          <Button label="Join now" onPress={()=>openWeb(meetNow.url)} icon="videocam"/>
         </Card>
       )}
       <View style={styles.search}><Icon name="search-outline" color={C.muted}/><TextInput value={query} onChangeText={setQuery} placeholder="Search meetings" placeholderTextColor={C.muted} style={styles.input}/></View>
@@ -715,9 +739,9 @@ function Meetings({ say, profile, meetings, loading }) {
           <View style={styles.time}><Text style={styles.timeText}>{m.time}</Text><Text style={styles.timeZone}>{m.day||'daily'}</Text></View>
           <View style={{flex:1}}>
             <Text style={styles.cardTitle}>{m.title}</Text>
-            <Text style={styles.meetingMeta}>{m.format} Â· {m.region}</Text>
+            <Text style={styles.meetingMeta}>{m.format} · {m.region}</Text>
             <Text style={styles.muted}>{m.language}</Text>
-            <Pressable onPress={()=>m.url?Linking.openURL(m.url):say('No link available')} style={styles.inlineAction}>
+            <Pressable onPress={()=>m.url?openWeb(m.url):say('No link available')} style={styles.inlineAction}>
               <Text style={styles.inlineText}>{m.action}</Text>
               <Icon name={m.format==='Remote'?'videocam-outline':'navigate-outline'} size={16} color={C.mint}/>
             </Pressable>
@@ -728,13 +752,13 @@ function Meetings({ say, profile, meetings, loading }) {
       <Card>
         <Text style={styles.mini}>CMA DIRECTORY</Text>
         <Text style={styles.muted}>Browse the full Crystal Meth Anonymous meeting directory online.</Text>
-        <Pressable onPress={()=>Linking.openURL('https://www.crystalmeth.org/meetings/?type=online')} style={styles.inlineAction}><Text style={styles.inlineText}>View all online meetings</Text><Icon name="open-outline" size={16} color={C.mint}/></Pressable>
+        <Pressable onPress={()=>openWeb('https://www.crystalmeth.org/meetings/?type=online')} style={styles.inlineAction}><Text style={styles.inlineText}>View all online meetings</Text><Icon name="open-outline" size={16} color={C.mint}/></Pressable>
       </Card>
     </ScrollView>
   );
 }
 
-// â"€â"€â"€ LEARN â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── LEARN ────────────────────────────────────────────────────────────────────
 function Learn({ say, onReadings, news }) {
   const [complete, setComplete] = useState(1);
   const [open, setOpen] = useState(1);
@@ -747,7 +771,7 @@ function Learn({ say, onReadings, news }) {
         <View style={styles.readingsBadge}><Icon name="book-outline" size={22} color={C.ink}/></View>
         <View style={{flex:1}}>
           <Text style={styles.cardTitle}>CMA Readings library</Text>
-          <Text style={styles.muted}>{READINGS.length} readings Â· PDF + audio narration by Jessica</Text>
+          <Text style={styles.muted}>{READINGS.length} readings · PDF + audio narration by Jessica</Text>
         </View>
         <Icon name="chevron-forward" color={C.muted}/>
       </Pressable>
@@ -766,7 +790,7 @@ function Learn({ say, onReadings, news }) {
                 </View>
                 <View style={{flex:1}}>
                   <Text style={styles.cardTitle}>{m.title}</Text>
-                  <Text style={styles.muted}>{done?'Complete Â· ':locked?'Next up Â· ':'Ready Â· '}{m.xp} XP</Text>
+                  <Text style={styles.muted}>{done?'Complete · ':locked?'Next up · ':'Ready · '}{m.xp} XP</Text>
                 </View>
                 <Icon name={isOpen?'chevron-up':'chevron-down'} color={C.muted}/>
               </View>
@@ -784,7 +808,7 @@ function Learn({ say, onReadings, news }) {
         <Text style={[styles.sectionTitle,{marginTop:8}]}>RECOVERY RESEARCH & NEWS</Text>
         <Text style={[styles.muted,{marginBottom:4}]}>From NIDA — the National Institute on Drug Abuse.</Text>
         {news.map(item=>(
-          <Pressable key={item.id} onPress={()=>Linking.openURL(item.link)} style={styles.newsCard}>
+          <Pressable key={item.id} onPress={()=>openWeb(item.link)} style={styles.newsCard}>
             <View style={styles.newsBadge}><Icon name="newspaper-outline" size={16} color={C.ink}/></View>
             <View style={{flex:1}}>
               <Text style={styles.newsTitle} numberOfLines={2}>{item.title}</Text>
@@ -799,15 +823,22 @@ function Learn({ say, onReadings, news }) {
   );
 }
 
-// â"€â"€â"€ CALM â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── CALM ─────────────────────────────────────────────────────────────────────
 function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
   const status = useAudioPlayerStatus(player);
   const [minutes, setMinutes] = useState(10);
   const [remaining, setRemaining] = useState(10*60);
   const [visual, setVisual] = useState('Breath');
+  const [hapticCues, setHapticCues] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState('All');
   const isPlaying = status.playing;
+
+  // player.loop covers most cases, but remote streams can still end; restart
+  // so soundscapes play indefinitely until the member stops them.
+  useEffect(()=>{
+    if (status.didJustFinish) { try { player.seekTo(0); player.play(); } catch {} }
+  },[status.didJustFinish, player]);
 
   useEffect(()=>{ setRemaining(minutes*60); },[minutes]);
   useEffect(()=>{
@@ -833,8 +864,8 @@ function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
       <Text style={styles.h1}>Take a calm moment.</Text>
       <Card style={styles.playerCard}>
         <Text style={styles.cardTitle}>{soundscape.name}</Text>
-        <Text style={styles.muted}>{soundscape.category} Â· {isPlaying?'Playing':'Paused'}</Text>
-        <BreathingGuide isPlaying={isPlaying}/>
+        <Text style={styles.muted}>{soundscape.category} · {isPlaying?'Playing':'Paused'}</Text>
+        <CalmVisual visual={visual} isPlaying={isPlaying} haptics={hapticCues}/>
         <Text style={styles.timer}>{display}</Text>
         <Pressable onPress={togglePlayback} style={styles.playButton}>
           <Icon name={isPlaying?'pause':'play'} size={26} color={C.ink}/>
@@ -843,6 +874,7 @@ function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
       </Card>
       <Text style={styles.sectionTitle}>CHOOSE A VISUAL LOOP</Text>
       <View style={styles.visualRow}>{[['Breath','ellipse-outline'],['Night','moon-outline'],['Waves','water-outline']].map(([name,icon])=><Pressable key={name} onPress={()=>setVisual(name)} style={[styles.visualChoice,visual===name&&styles.visualChoiceActive]}><Icon name={icon} size={18} color={visual===name?C.ink:C.muted}/><Text style={[styles.visualText,visual===name&&styles.visualTextActive]}>{name}</Text></Pressable>)}</View>
+      {visual==='Breath'&&<Pressable onPress={()=>setHapticCues(v=>!v)} style={[styles.visualChoice,{marginTop:2},hapticCues&&styles.visualChoiceActive]}><Icon name="radio-outline" size={16} color={hapticCues?C.ink:C.muted}/><Text style={[styles.visualText,hapticCues&&styles.visualTextActive]}>Haptic breathing cues {hapticCues?'on':'off'}</Text></Pressable>}
       <Text style={styles.sectionTitle}>CHOOSE YOUR SESSION</Text>
       <View style={styles.sessionRow}>{[5,10,20].map(v=><Pressable key={v} onPress={()=>setSession(v)} style={[styles.session,minutes===v&&styles.sessionActive]}><Text style={[styles.sessionText,minutes===v&&styles.sessionTextActive]}>{v} min</Text></Pressable>)}</View>
       <Pressable onPress={()=>setPickerOpen(true)} style={styles.soundscapePicker}>
@@ -877,38 +909,110 @@ function Calm({ player, soundscape, soundscapes, onSelectSoundscape }) {
 }
 
 // Breathing guide — now the hero of the Calm screen, not a modal
-function BreathingGuide({ isPlaying }) {
+function BreathingGuide({ isPlaying, haptics }) {
   const pulse = useRef(new Animated.Value(.72)).current;
+  const glow = useRef(new Animated.Value(0)).current;
   const [phase, setPhase] = useState('Breathe in');
   const anim = useRef(null);
   useEffect(()=>{
     if (!isPlaying) { anim.current?.stop(); setPhase('Ready'); return; }
-    const steps = [['Breathe in',1.16,4000],['Hold',1.16,2000],['Breathe out',.72,4000],['Hold',.72,2000]];
+    const steps = [['Breathe in',1.18,4000],['Hold',1.18,2000],['Breathe out',.72,4000],['Hold',.72,2000]];
     let idx=0, active=true;
     const run=()=>{
       if (!active) return;
       const [label,scale,dur]=steps[idx];
       setPhase(label);
-      anim.current = Animated.timing(pulse,{toValue:scale,duration:dur,easing:Easing.inOut(Easing.sin),useNativeDriver:true});
+      if (haptics) {
+        if (label==='Breathe in') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(()=>{});
+        else if (label==='Breathe out') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
+        else Haptics.selectionAsync().catch(()=>{});
+      }
+      anim.current = Animated.parallel([
+        Animated.timing(pulse,{toValue:scale,duration:dur,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),
+        Animated.timing(glow,{toValue:label==='Breathe in'||(label==='Hold'&&scale>1)?1:0,duration:dur,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),
+      ]);
       anim.current.start(({finished})=>{ if(finished&&active){ idx=(idx+1)%steps.length; run(); } });
     };
     run();
     return ()=>{ active=false; anim.current?.stop(); };
-  },[isPlaying,pulse]);
+  },[isPlaying,pulse,glow,haptics]);
   return (
     <View style={styles.breathGuide}>
+      <Animated.View style={[styles.breathGlow,{opacity:glow,transform:[{scale:Animated.multiply(pulse,1.12)}]}]}/>
       <Animated.View style={[styles.breathGuideOuter,{transform:[{scale:pulse}]}]}/>
-      <Animated.View style={[styles.breathGuideInner,{transform:[{scale:Animated.multiply(pulse,.66)}]}]}/>
+      <Animated.View style={[styles.breathGuideInner,{transform:[{scale:Animated.multiply(pulse,.82)}]}]}/>
+      <Animated.View style={[styles.breathFill,{opacity:Animated.add(.35,Animated.multiply(glow,.35)),transform:[{scale:Animated.multiply(pulse,.6)}]}]}/>
       <View style={styles.breathGuideCenter}>
         <Icon name="leaf" size={28} color={C.mint}/>
         <Text style={styles.breathPhase}>{phase}</Text>
-        <Text style={styles.breathCount}>{isPlaying?'4 Â· 2 Â· 4 Â· 2 pattern':'Press begin to start'}</Text>
+        {!isPlaying&&<Text style={styles.breathCount}>Press begin to start</Text>}
       </View>
     </View>
   );
 }
 
-// â"€â"€â"€ CONNECT â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+function NightGuide({ isPlaying }) {
+  const stars = useRef(Array.from({length:14},(_,i)=>({
+    v:new Animated.Value(.15+((i*37)%50)/100),
+    left:(i*61)%210-105, top:(i*47)%180-90, size:2+(i%3),
+  }))).current;
+  const drift = useRef(new Animated.Value(0)).current;
+  useEffect(()=>{
+    if (!isPlaying) return;
+    const loops = stars.map((s,i)=>Animated.loop(Animated.sequence([
+      Animated.timing(s.v,{toValue:.9,duration:1400+(i%5)*600,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),
+      Animated.timing(s.v,{toValue:.15,duration:1400+((i+2)%5)*600,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),
+    ])));
+    const driftLoop = Animated.loop(Animated.sequence([
+      Animated.timing(drift,{toValue:1,duration:6000,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),
+      Animated.timing(drift,{toValue:0,duration:6000,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),
+    ]));
+    loops.forEach(l=>l.start()); driftLoop.start();
+    return ()=>{ loops.forEach(l=>l.stop()); driftLoop.stop(); };
+  },[isPlaying,stars,drift]);
+  return (
+    <View style={styles.breathGuide}>
+      {stars.map((s,i)=>(
+        <Animated.View key={i} style={{position:'absolute',left:110+s.left,top:110+s.top,width:s.size,height:s.size,borderRadius:s.size,backgroundColor:C.warm,opacity:isPlaying?s.v:.3}}/>
+      ))}
+      <Animated.View style={{transform:[{translateY:drift.interpolate({inputRange:[0,1],outputRange:[4,-4]})}]}}>
+        <Icon name="moon" size={46} color={C.gold}/>
+      </Animated.View>
+      {!isPlaying&&<Text style={[styles.breathCount,{position:'absolute',bottom:24}]}>Press begin to start</Text>}
+    </View>
+  );
+}
+
+function WavesGuide({ isPlaying }) {
+  const ripples = useRef([0,1,2].map(()=>new Animated.Value(0))).current;
+  useEffect(()=>{
+    if (!isPlaying) return;
+    const loops = ripples.map((r,i)=>Animated.loop(Animated.sequence([
+      Animated.delay(i*1500),
+      Animated.timing(r,{toValue:1,duration:4500,easing:Easing.out(Easing.sin),useNativeDriver:true}),
+      Animated.timing(r,{toValue:0,duration:0,useNativeDriver:true}),
+    ])));
+    loops.forEach(l=>l.start());
+    return ()=>loops.forEach(l=>l.stop());
+  },[isPlaying,ripples]);
+  return (
+    <View style={styles.breathGuide}>
+      {ripples.map((r,i)=>(
+        <Animated.View key={i} style={[styles.waveRipple,{opacity:r.interpolate({inputRange:[0,.15,1],outputRange:[0,.75,0]}),transform:[{scale:r.interpolate({inputRange:[0,1],outputRange:[.35,1.55]})}]}]}/>
+      ))}
+      <Icon name="water" size={40} color={C.blue}/>
+      {!isPlaying&&<Text style={[styles.breathCount,{position:'absolute',bottom:24}]}>Press begin to start</Text>}
+    </View>
+  );
+}
+
+function CalmVisual({ visual, isPlaying, haptics }) {
+  if (visual==='Night') return <NightGuide isPlaying={isPlaying}/>;
+  if (visual==='Waves') return <WavesGuide isPlaying={isPlaying}/>;
+  return <BreathingGuide isPlaying={isPlaying} haptics={haptics}/>;
+}
+
+// ─── CONNECT ──────────────────────────────────────────────────────────────────
 function timeAgo(iso) {
   if (!iso) return '';
   const mins = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
@@ -1021,7 +1125,7 @@ function Connect({ say }) {
           <View style={styles.rowBetween}><Text style={styles.topic}>{post.category}</Text><Text style={styles.postTime}>{post.time}</Text></View>
           <View style={styles.postHead}><Pressable onPress={()=>setMember(post)} style={styles.avatar}><Text style={styles.avatarText}>{post.initial}</Text></Pressable><Pressable onPress={()=>setMember(post)}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.tapHint}>Tap to view profile</Text></Pressable></View>
           <Pressable onPress={()=>openPost(post)}><Text style={styles.postText}>{post.body}</Text></Pressable>
-          <Pressable onPress={()=>openPost(post)} style={styles.commentAction}><Icon name="chatbubble-ellipses-outline" color={C.mint}/><Text style={styles.commentActionText}>{Math.max(post.commentCount||0,post.comments.length)} {Math.max(post.commentCount||0,post.comments.length)===1?'comment':'comments'} Â· join gently</Text><Icon name="chevron-forward" size={15} color={C.muted}/></Pressable>
+          <Pressable onPress={()=>openPost(post)} style={styles.commentAction}><Icon name="chatbubble-ellipses-outline" color={C.mint}/><Text style={styles.commentActionText}>{Math.max(post.commentCount||0,post.comments.length)} {Math.max(post.commentCount||0,post.comments.length)===1?'comment':'comments'} · join gently</Text><Icon name="chevron-forward" size={15} color={C.muted}/></Pressable>
         </Card>
       ))}
       {visiblePosts.length===0&&<View style={styles.boardEmpty}><Icon name="shield-outline" size={31} color={C.mint}/><Text style={styles.cardTitle}>Your circle is quiet.</Text></View>}
@@ -1100,7 +1204,7 @@ function Connect({ say }) {
   );
 }
 
-// â"€â"€â"€ JOURNAL â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── JOURNAL ─────────────────────────────────────────────────────────────────
 function Journal({ say, entries, onAdd }) {
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState('');
@@ -1108,7 +1212,7 @@ function Journal({ say, entries, onAdd }) {
   const save=()=>{ if(!body.trim()) return say('Write a few words before keeping this entry.'); const entry={id:Date.now(),body:body.trim(),mood,date:new Date().toLocaleDateString('en-US',{month:'long',day:'numeric'})}; onAdd(entry); setBody(''); setOpen(false); say('Entry saved.'); };
   return (
     <ScrollView contentContainerStyle={[styles.scroll,styles.journalScroll]}>
-      <Text style={styles.eyebrow}>PRIVATE Â· NEVER SHOWN IN COMMUNITY</Text>
+      <Text style={styles.eyebrow}>PRIVATE · NEVER SHOWN IN COMMUNITY</Text>
       <Text style={styles.h1}>Your journal</Text>
       <Text style={styles.intro}>A place for what is yours.</Text>
       <Pressable onPress={()=>setOpen(true)} style={styles.journalNew}><Icon name="create-outline" color={C.ink}/><Text style={styles.composeText}>Write an entry</Text></Pressable>
@@ -1130,7 +1234,7 @@ function Journal({ say, entries, onAdd }) {
   );
 }
 
-// â"€â"€â"€ SUPPORT CARD (Stripe + Venmo) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── SUPPORT CARD (Stripe + Venmo) ─────────────────────────────────────────
 function SupportNorthstar({ say }) {
   const donate = (amount, label) => {
     Linking.openURL(`venmo://paycharge?txn=pay&recipients=${VENMO_USER}&amount=${amount}&note=Northstar Recovery Support`)
@@ -1158,7 +1262,7 @@ function SupportNorthstar({ say }) {
   );
 }
 
-// â"€â"€â"€ YOU â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── YOU ──────────────────────────────────────────────────────────────────────
 function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries, saveProfile }) {
   const [prefs, setPrefs] = useState({ meetings:true, insight:false, checkin:false, circleNotifs:true });
   const name = profile.pseudonym || 'Northstar member';
@@ -1290,7 +1394,7 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
       <Card>
         <Text style={styles.cardTitle}>Official CMA literature</Text>
         <Text style={styles.muted}>The Crystal Meth Anonymous resource library.</Text>
-        <Pressable onPress={()=>Linking.openURL('https://www.crystalmeth.org/')} style={styles.inlineAction}>
+        <Pressable onPress={()=>openWeb('https://www.crystalmeth.org/')} style={styles.inlineAction}>
           <Text style={styles.inlineText}>Visit crystalmeth.org</Text>
           <Icon name="open-outline" size={16} color={C.mint}/>
         </Pressable>
@@ -1304,13 +1408,13 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
   );
 }
 
-// â"€â"€â"€ READINGS LIBRARY â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── READINGS LIBRARY ─────────────────────────────────────────────────────────
 function ReadingsLibrary({ onClose }) {
   const [selected, setSelected] = useState(null);
   return (
     <SafeAreaView style={styles.onboardSafe}>
       <View style={[styles.header,{height:64}]}>
-        <View><Text style={styles.brand}>READINGS</Text><Text style={styles.brandSub}>CMA literature Â· narrated by Jessica</Text></View>
+        <View><Text style={styles.brand}>READINGS</Text><Text style={styles.brandSub}>CMA literature · narrated by Jessica</Text></View>
         <Pressable onPress={onClose} style={styles.iconBtn}><Icon name="close"/></Pressable>
       </View>
       <ScrollView contentContainerStyle={[styles.scroll,{paddingTop:8}]}>
@@ -1322,7 +1426,7 @@ function ReadingsLibrary({ onClose }) {
             </View>
             <View style={{flex:1}}>
               <Text style={[styles.cardTitle,selected?.id===r.id&&{color:C.ink}]}>{r.title}</Text>
-              <Text style={[styles.muted,selected?.id===r.id&&{color:'#1a4a3a'}]}>{r.durationEst} Â· {r.description.slice(0,55)}…</Text>
+              <Text style={[styles.muted,selected?.id===r.id&&{color:'#1a4a3a'}]}>{r.durationEst} · {r.description.slice(0,55)}…</Text>
             </View>
             <Icon name={selected?.id===r.id?'chevron-down':'chevron-forward'} size={16} color={selected?.id===r.id?C.ink:C.muted}/>
           </Pressable>
@@ -1331,7 +1435,7 @@ function ReadingsLibrary({ onClose }) {
         <Card style={{marginTop:4}}>
           <Text style={styles.mini}>FULL LITERATURE LIBRARY</Text>
           <Text style={styles.muted}>More pamphlets and workbooks are available on the official CMA website.</Text>
-          <Pressable onPress={()=>Linking.openURL('https://www.crystalmeth.org/cma-literature/')} style={styles.inlineAction}>
+          <Pressable onPress={()=>openWeb('https://www.crystalmeth.org/cma-literature/')} style={styles.inlineAction}>
             <Text style={styles.inlineText}>Browse crystalmeth.org/literature</Text>
             <Icon name="open-outline" size={16} color={C.mint}/>
           </Pressable>
@@ -1346,7 +1450,9 @@ function ReadingPlayer({ reading, onClose }) {
   const status = useAudioPlayerStatus(player);
   const progress = status.duration > 0 ? status.currentTime / status.duration : 0;
   const fmt = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
-  useEffect(()=>{ return ()=>{ player.pause(); }; },[player]);
+  // Switching readings releases the old native player before this cleanup
+  // runs; pausing a released player throws NativeSharedObjectNotFoundException.
+  useEffect(()=>{ return ()=>{ try { player.pause(); } catch {} }; },[player]);
   const toggle = ()=>{ if(status.playing) player.pause(); else player.play(); };
   const seek = frac => player.seekTo(frac * status.duration);
   return (
@@ -1380,7 +1486,7 @@ function ReadingPlayer({ reading, onClose }) {
         </Pressable>
       </View>
       <View style={styles.readingActions}>
-        <Pressable onPress={()=>Linking.openURL(reading.pdfUrl)} style={styles.readingAction}>
+        <Pressable onPress={()=>openWeb(reading.pdfUrl)} style={styles.readingAction}>
           <Icon name="document-text-outline" color={C.gold}/>
           <Text style={styles.readingActionText}>Open PDF</Text>
         </Pressable>
@@ -1389,7 +1495,7 @@ function ReadingPlayer({ reading, onClose }) {
           Alert.alert('Play for your room',`A private video room is ready. Share the link, join, then press play here — the reading ("${reading.title}") plays from your device while the room listens.`,[
             {text:'Cancel',style:'cancel'},
             {text:'Share link',onPress:()=>Share.share({message:`Join me for a CMA reading (${reading.title}): ${roomUrl}`})},
-            {text:'Share & join',onPress:()=>{Share.share({message:`Join me for a CMA reading (${reading.title}): ${roomUrl}`});Linking.openURL(roomUrl);}},
+            {text:'Share & join',onPress:()=>{Share.share({message:`Join me for a CMA reading (${reading.title}): ${roomUrl}`});openWeb(roomUrl);}},
           ]);
         }} style={styles.readingAction}>
           <Icon name="people-outline" color={C.blue}/>
@@ -1400,10 +1506,10 @@ function ReadingPlayer({ reading, onClose }) {
   );
 }
 
-// â"€â"€â"€ STYLES â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ─── STYLES ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   standard:{flexDirection:'row',gap:9,padding:13,borderLeftWidth:2,borderColor:C.mint,backgroundColor:'#16343a'}, standardText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, boardPost:{gap:11}, topic:{color:C.mint,fontSize:10,fontWeight:'900',letterSpacing:1.2}, postTime:{color:C.muted,fontSize:11}, tapHint:{color:C.blue,fontSize:11,marginTop:1}, commentAction:{flexDirection:'row',alignItems:'center',gap:7,paddingTop:11,borderTopWidth:1,borderColor:C.line}, commentActionText:{color:C.mint,fontSize:12,fontWeight:'800',flex:1}, boardEmpty:{minHeight:180,justifyContent:'center',alignItems:'center',gap:10,padding:24,borderWidth:1,borderColor:C.line,borderRadius:17}, memberHero:{flexDirection:'row',alignItems:'center',gap:13}, memberAvatar:{height:57,width:57,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, profileSafety:{flexDirection:'row',gap:9,padding:12,backgroundColor:'#17363a',borderRadius:12}, profileSafetyText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, dangerAction:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, dangerText:{color:C.gold,fontWeight:'800',fontSize:14}, postSheet:{height:'88%',paddingBottom:20}, threadScroll:{flexGrow:0,flexShrink:1}, threadContent:{gap:12,paddingBottom:8}, threadComposer:{gap:8,paddingTop:10,borderTopWidth:1,borderColor:C.line}, comment:{padding:11,backgroundColor:C.raised,borderRadius:11,gap:3}, commentName:{color:C.warm,fontWeight:'800',fontSize:13}, commentInput:{color:C.warm,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,minHeight:52,fontSize:14},
-  safe:{flex:1,backgroundColor:C.ink}, topo:{position:'absolute',top:0,left:0,right:0,height:210,backgroundColor:'#172944',borderBottomLeftRadius:110,borderBottomRightRadius:40,opacity:.8}, header:{height:76,paddingHorizontal:20,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, brand:{color:C.warm,fontSize:15,fontWeight:'900',letterSpacing:2}, brandSub:{color:C.muted,fontSize:10,marginTop:3}, headerBtns:{flexDirection:'row',gap:9}, iconBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,borderRadius:12}, helpBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.mint,borderRadius:12}, body:{flex:1}, scroll:{padding:20,paddingBottom:28,gap:14}, eyebrow:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, mini:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, sectionTitle:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2,marginTop:7}, h1:{color:C.warm,fontSize:31,lineHeight:36,fontWeight:'900',letterSpacing:-.6}, intro:{color:C.muted,fontSize:15,lineHeight:22,marginTop:-7,marginBottom:3}, card:{backgroundColor:C.surface,borderWidth:1,borderColor:'rgba(157,173,197,.14)',padding:16,borderRadius:18,gap:12}, streak:{backgroundColor:'#202e42',flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderColor:'#466176'}, streakNum:{color:C.warm,fontSize:37,fontWeight:'900',marginTop:2}, streakUnit:{fontSize:16,color:C.muted}, muted:{color:C.muted,fontSize:13,lineHeight:19}, sun:{height:56,width:56,borderRadius:28,backgroundColor:'#344154',alignItems:'center',justifyContent:'center'}, rowBetween:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:12}, row:{flexDirection:'row',alignItems:'center',gap:18}, cardTitle:{color:C.warm,fontSize:16,fontWeight:'800',lineHeight:21}, remote:{padding:10,backgroundColor:'#183c3a',borderRadius:12}, button:{backgroundColor:C.mint,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:12,borderRadius:12,marginTop:1}, buttonDark:{backgroundColor:C.raised,borderWidth:1,borderColor:C.line}, buttonText:{color:C.ink,fontWeight:'900',fontSize:14}, quote:{color:C.warm,fontSize:18,lineHeight:27,fontWeight:'600',paddingHorizontal:7,paddingVertical:9}, actionRow:{flexDirection:'row',gap:10}, quick:{flex:1,minHeight:95,backgroundColor:C.raised,borderRadius:16,padding:14,justifyContent:'space-between'}, quickText:{color:C.warm,fontSize:14,fontWeight:'800'}, support:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, supportText:{color:C.gold,fontWeight:'800',fontSize:13}, supportCard:{borderColor:'rgba(93,224,166,.36)'}, supportBadge:{height:38,width:38,borderRadius:13,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, supportFinePrint:{color:C.muted,fontSize:12,lineHeight:17}, supportOptions:{flexDirection:'row',gap:8}, supportOption:{flex:1,backgroundColor:C.raised,borderWidth:1,borderColor:C.line,borderRadius:12,paddingVertical:11,alignItems:'center',gap:2}, supportPrice:{color:C.mint,fontSize:16,fontWeight:'900'}, supportOptionLabel:{color:C.muted,fontSize:9,fontWeight:'700',textAlign:'center'}, tabbar:{height:72,backgroundColor:'#141f31',borderTopWidth:1,borderColor:'#293850',flexDirection:'row',paddingHorizontal:2}, tab:{flex:1,alignItems:'center',justifyContent:'center',gap:3}, tabText:{color:C.muted,fontSize:8,fontWeight:'700'}, location:{flexDirection:'row',alignItems:'center',gap:7}, locationText:{color:C.warm,fontSize:13,fontWeight:'700'}, change:{color:C.mint,fontSize:12,fontWeight:'800',marginLeft:'auto'}, search:{flexDirection:'row',alignItems:'center',backgroundColor:C.surface,borderRadius:13,paddingHorizontal:13,borderWidth:1,borderColor:C.line}, input:{color:C.warm,height:46,flex:1,marginLeft:8,fontSize:14}, segmentScroll:{marginHorizontal:-20,paddingHorizontal:20,flexGrow:0}, segment:{paddingVertical:9,paddingHorizontal:14,marginRight:8,borderRadius:11,borderWidth:1,borderColor:C.line}, segmentActive:{backgroundColor:C.mint,borderColor:C.mint}, segmentText:{color:C.muted,fontWeight:'800',fontSize:13}, segmentTextActive:{color:C.ink}, results:{color:C.muted,fontSize:12,fontWeight:'700'}, meeting:{flexDirection:'row',gap:13}, time:{width:54,borderRightWidth:1,borderColor:C.line}, timeText:{color:C.warm,fontWeight:'900',fontSize:14}, timeZone:{color:C.muted,fontSize:10,marginTop:3}, meetingMeta:{color:C.blue,fontSize:12,fontWeight:'700',marginTop:2}, inlineAction:{flexDirection:'row',alignItems:'center',gap:5,marginTop:7}, inlineText:{color:C.mint,fontWeight:'800',fontSize:13}, empty:{alignItems:'center',paddingVertical:30}, xp:{backgroundColor:'#26304b',flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, xpNum:{color:C.gold,fontWeight:'900',fontSize:25,marginTop:3}, xpSmall:{fontSize:13,color:C.muted}, module:{gap:0}, moduleDot:{height:31,width:31,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,marginRight:11}, moduleDetail:{borderTopWidth:1,borderColor:C.line,marginTop:14,paddingTop:12,gap:7}, moduleCopy:{color:C.warm,lineHeight:20,fontSize:14,fontWeight:'700'}, step:{color:C.muted,fontSize:13}, calmTab:{flex:1}, hidden:{display:'none'}, playerCard:{alignItems:'center',paddingVertical:20,gap:8}, breathGuide:{height:220,width:220,alignSelf:'center',alignItems:'center',justifyContent:'center',marginVertical:8}, breathGuideOuter:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:2,borderColor:'rgba(93,224,166,.58)'}, breathGuideInner:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:1,borderColor:'rgba(117,184,255,.7)'}, breathGuideCenter:{alignItems:'center',gap:4}, breathPhase:{color:C.warm,fontSize:20,fontWeight:'900',marginTop:5}, breathCount:{color:C.muted,fontSize:12,textAlign:'center'}, timer:{color:C.warm,fontSize:38,fontWeight:'900',letterSpacing:1}, playButton:{alignSelf:'stretch',backgroundColor:C.mint,paddingVertical:13,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:9}, playText:{color:C.ink,fontSize:15,fontWeight:'900'}, sessionRow:{flexDirection:'row',gap:9}, session:{flex:1,paddingVertical:12,alignItems:'center',borderWidth:1,borderColor:C.line,borderRadius:12,backgroundColor:C.raised}, sessionActive:{backgroundColor:C.mint,borderColor:C.mint}, sessionText:{color:C.muted,fontWeight:'800'}, sessionTextActive:{color:C.ink}, visualRow:{flexDirection:'row',gap:8}, visualChoice:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,paddingVertical:10,borderRadius:11,borderWidth:1,borderColor:C.line,backgroundColor:C.raised}, visualChoiceActive:{backgroundColor:C.mint,borderColor:C.mint}, visualText:{color:C.muted,fontSize:12,fontWeight:'800'}, visualTextActive:{color:C.ink}, soundscapePicker:{flexDirection:'row',alignItems:'center',gap:10,padding:14,backgroundColor:C.raised,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapePickerText:{flex:1,color:C.warm,fontSize:14,fontWeight:'700'}, soundscapeRow:{flexDirection:'row',alignItems:'center',gap:12,padding:14,backgroundColor:C.surface,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapeRowActive:{backgroundColor:C.mint,borderColor:C.mint}, compose:{backgroundColor:C.mint,padding:14,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, composeText:{fontSize:14,color:C.ink,fontWeight:'900'}, postHead:{flexDirection:'row',alignItems:'center',gap:10}, avatar:{height:35,width:35,borderRadius:12,backgroundColor:'#476686',alignItems:'center',justifyContent:'center'}, avatarText:{color:C.warm,fontWeight:'900'}, postText:{color:C.warm,fontSize:15,lineHeight:22}, profile:{flexDirection:'row',alignItems:'center'}, bigAvatar:{width:56,height:56,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, bigAvatarText:{color:C.ink,fontSize:22,fontWeight:'900'}, achievement:{flexDirection:'row',alignItems:'center',gap:12,padding:14,borderWidth:1,borderColor:'#66583d',borderRadius:16}, setting:{flexDirection:'row',alignItems:'center',paddingVertical:11,borderBottomWidth:1,borderColor:C.line,gap:12}, modalBack:{flex:1,backgroundColor:'rgba(5,9,16,.7)',justifyContent:'flex-end'}, sheet:{backgroundColor:'#223047',padding:22,paddingBottom:35,borderTopLeftRadius:26,borderTopRightRadius:26,gap:13}, handle:{width:40,height:4,backgroundColor:C.muted,borderRadius:4,alignSelf:'center',opacity:.5}, sheetTitle:{color:C.warm,fontSize:22,fontWeight:'900'}, sheetCopy:{color:C.muted,lineHeight:21,fontSize:14}, composeInput:{color:C.warm,minHeight:105,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,textAlignVertical:'top',fontSize:15}, toast:{position:'absolute',left:20,right:20,bottom:84,backgroundColor:'#263a44',padding:13,borderRadius:13,flexDirection:'row',alignItems:'center',gap:8,borderWidth:1,borderColor:'#478f72'}, toastText:{color:C.warm,fontSize:13,fontWeight:'700',flex:1},
+  safe:{flex:1,backgroundColor:C.ink}, topo:{position:'absolute',top:0,left:0,right:0,height:210,backgroundColor:'#172944',borderBottomLeftRadius:110,borderBottomRightRadius:40,opacity:.8}, header:{height:76,paddingHorizontal:20,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, brand:{color:C.warm,fontSize:15,fontWeight:'900',letterSpacing:2}, brandSub:{color:C.muted,fontSize:10,marginTop:3}, headerBtns:{flexDirection:'row',gap:9}, iconBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,borderRadius:12}, helpBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.mint,borderRadius:12}, body:{flex:1}, scroll:{padding:20,paddingBottom:28,gap:14}, eyebrow:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, mini:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, sectionTitle:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2,marginTop:7}, h1:{color:C.warm,fontSize:31,lineHeight:36,fontWeight:'900',letterSpacing:-.6}, intro:{color:C.muted,fontSize:15,lineHeight:22,marginTop:-7,marginBottom:3}, card:{backgroundColor:C.surface,borderWidth:1,borderColor:'rgba(157,173,197,.14)',padding:16,borderRadius:18,gap:12}, streak:{backgroundColor:'#202e42',flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderColor:'#466176'}, streakNum:{color:C.warm,fontSize:37,fontWeight:'900',marginTop:2}, streakUnit:{fontSize:16,color:C.muted}, muted:{color:C.muted,fontSize:13,lineHeight:19}, sun:{height:56,width:56,borderRadius:28,backgroundColor:'#344154',alignItems:'center',justifyContent:'center'}, rowBetween:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:12}, row:{flexDirection:'row',alignItems:'center',gap:18}, cardTitle:{color:C.warm,fontSize:16,fontWeight:'800',lineHeight:21}, remote:{padding:10,backgroundColor:'#183c3a',borderRadius:12}, button:{backgroundColor:C.mint,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:12,borderRadius:12,marginTop:1}, buttonDark:{backgroundColor:C.raised,borderWidth:1,borderColor:C.line}, buttonText:{color:C.ink,fontWeight:'900',fontSize:14}, quote:{color:C.warm,fontSize:18,lineHeight:27,fontWeight:'600',paddingHorizontal:7,paddingVertical:9}, actionRow:{flexDirection:'row',gap:10}, quick:{flex:1,minHeight:95,backgroundColor:C.raised,borderRadius:16,padding:14,justifyContent:'space-between'}, quickText:{color:C.warm,fontSize:14,fontWeight:'800'}, support:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, supportText:{color:C.gold,fontWeight:'800',fontSize:13}, supportCard:{borderColor:'rgba(93,224,166,.36)'}, supportBadge:{height:38,width:38,borderRadius:13,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, supportFinePrint:{color:C.muted,fontSize:12,lineHeight:17}, supportOptions:{flexDirection:'row',gap:8}, supportOption:{flex:1,backgroundColor:C.raised,borderWidth:1,borderColor:C.line,borderRadius:12,paddingVertical:11,alignItems:'center',gap:2}, supportPrice:{color:C.mint,fontSize:16,fontWeight:'900'}, supportOptionLabel:{color:C.muted,fontSize:9,fontWeight:'700',textAlign:'center'}, tabbar:{height:72,backgroundColor:'#141f31',borderTopWidth:1,borderColor:'#293850',flexDirection:'row',paddingHorizontal:2}, tab:{flex:1,alignItems:'center',justifyContent:'center',gap:3}, tabText:{color:C.muted,fontSize:8,fontWeight:'700'}, location:{flexDirection:'row',alignItems:'center',gap:7}, locationText:{color:C.warm,fontSize:13,fontWeight:'700'}, change:{color:C.mint,fontSize:12,fontWeight:'800',marginLeft:'auto'}, search:{flexDirection:'row',alignItems:'center',backgroundColor:C.surface,borderRadius:13,paddingHorizontal:13,borderWidth:1,borderColor:C.line}, input:{color:C.warm,height:46,flex:1,marginLeft:8,fontSize:14}, segmentScroll:{marginHorizontal:-20,paddingHorizontal:20,flexGrow:0}, segment:{paddingVertical:9,paddingHorizontal:14,marginRight:8,borderRadius:11,borderWidth:1,borderColor:C.line}, segmentActive:{backgroundColor:C.mint,borderColor:C.mint}, segmentText:{color:C.muted,fontWeight:'800',fontSize:13}, segmentTextActive:{color:C.ink}, results:{color:C.muted,fontSize:12,fontWeight:'700'}, meeting:{flexDirection:'row',gap:13}, time:{width:54,borderRightWidth:1,borderColor:C.line}, timeText:{color:C.warm,fontWeight:'900',fontSize:14}, timeZone:{color:C.muted,fontSize:10,marginTop:3}, meetingMeta:{color:C.blue,fontSize:12,fontWeight:'700',marginTop:2}, inlineAction:{flexDirection:'row',alignItems:'center',gap:5,marginTop:7}, inlineText:{color:C.mint,fontWeight:'800',fontSize:13}, empty:{alignItems:'center',paddingVertical:30}, xp:{backgroundColor:'#26304b',flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, xpNum:{color:C.gold,fontWeight:'900',fontSize:25,marginTop:3}, xpSmall:{fontSize:13,color:C.muted}, module:{gap:0}, moduleDot:{height:31,width:31,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,marginRight:11}, moduleDetail:{borderTopWidth:1,borderColor:C.line,marginTop:14,paddingTop:12,gap:7}, moduleCopy:{color:C.warm,lineHeight:20,fontSize:14,fontWeight:'700'}, step:{color:C.muted,fontSize:13}, calmTab:{flex:1}, hidden:{display:'none'}, playerCard:{alignItems:'center',paddingVertical:20,gap:8}, breathGuide:{height:220,width:220,alignSelf:'center',alignItems:'center',justifyContent:'center',marginVertical:8}, breathGuideOuter:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:2,borderColor:'rgba(93,224,166,.58)'}, breathGuideInner:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:1,borderColor:'rgba(117,184,255,.7)'}, breathGuideCenter:{alignItems:'center',gap:4}, breathGlow:{position:'absolute',width:200,height:200,borderRadius:100,backgroundColor:'rgba(93,224,166,.16)'}, breathFill:{position:'absolute',width:190,height:190,borderRadius:95,backgroundColor:'rgba(93,224,166,.22)'}, waveRipple:{position:'absolute',width:170,height:170,borderRadius:85,borderWidth:2,borderColor:C.blue}, breathPhase:{color:C.warm,fontSize:20,fontWeight:'900',marginTop:5}, breathCount:{color:C.muted,fontSize:12,textAlign:'center'}, timer:{color:C.warm,fontSize:38,fontWeight:'900',letterSpacing:1}, playButton:{alignSelf:'stretch',backgroundColor:C.mint,paddingVertical:13,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:9}, playText:{color:C.ink,fontSize:15,fontWeight:'900'}, sessionRow:{flexDirection:'row',gap:9}, session:{flex:1,paddingVertical:12,alignItems:'center',borderWidth:1,borderColor:C.line,borderRadius:12,backgroundColor:C.raised}, sessionActive:{backgroundColor:C.mint,borderColor:C.mint}, sessionText:{color:C.muted,fontWeight:'800'}, sessionTextActive:{color:C.ink}, visualRow:{flexDirection:'row',gap:8}, visualChoice:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,paddingVertical:10,borderRadius:11,borderWidth:1,borderColor:C.line,backgroundColor:C.raised}, visualChoiceActive:{backgroundColor:C.mint,borderColor:C.mint}, visualText:{color:C.muted,fontSize:12,fontWeight:'800'}, visualTextActive:{color:C.ink}, soundscapePicker:{flexDirection:'row',alignItems:'center',gap:10,padding:14,backgroundColor:C.raised,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapePickerText:{flex:1,color:C.warm,fontSize:14,fontWeight:'700'}, soundscapeRow:{flexDirection:'row',alignItems:'center',gap:12,padding:14,backgroundColor:C.surface,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapeRowActive:{backgroundColor:C.mint,borderColor:C.mint}, compose:{backgroundColor:C.mint,padding:14,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, composeText:{fontSize:14,color:C.ink,fontWeight:'900'}, postHead:{flexDirection:'row',alignItems:'center',gap:10}, avatar:{height:35,width:35,borderRadius:12,backgroundColor:'#476686',alignItems:'center',justifyContent:'center'}, avatarText:{color:C.warm,fontWeight:'900'}, postText:{color:C.warm,fontSize:15,lineHeight:22}, profile:{flexDirection:'row',alignItems:'center'}, bigAvatar:{width:56,height:56,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, bigAvatarText:{color:C.ink,fontSize:22,fontWeight:'900'}, achievement:{flexDirection:'row',alignItems:'center',gap:12,padding:14,borderWidth:1,borderColor:'#66583d',borderRadius:16}, setting:{flexDirection:'row',alignItems:'center',paddingVertical:11,borderBottomWidth:1,borderColor:C.line,gap:12}, modalBack:{flex:1,backgroundColor:'rgba(5,9,16,.7)',justifyContent:'flex-end'}, sheet:{backgroundColor:'#223047',padding:22,paddingBottom:35,borderTopLeftRadius:26,borderTopRightRadius:26,gap:13}, handle:{width:40,height:4,backgroundColor:C.muted,borderRadius:4,alignSelf:'center',opacity:.5}, sheetTitle:{color:C.warm,fontSize:22,fontWeight:'900'}, sheetCopy:{color:C.muted,lineHeight:21,fontSize:14}, composeInput:{color:C.warm,minHeight:105,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,textAlignVertical:'top',fontSize:15}, toast:{position:'absolute',left:20,right:20,bottom:84,backgroundColor:'#263a44',padding:13,borderRadius:13,flexDirection:'row',alignItems:'center',gap:8,borderWidth:1,borderColor:'#478f72'}, toastText:{color:C.warm,fontSize:13,fontWeight:'700',flex:1},
   onboardSafe:{flex:1,backgroundColor:C.ink}, onboardStar:{height:180,alignItems:'center',justifyContent:'center',backgroundColor:'#173047',borderBottomRightRadius:95,borderBottomLeftRadius:35}, welcomeBody:{padding:28,gap:15}, welcomeTitle:{color:C.warm,fontSize:38,fontWeight:'900',lineHeight:44,letterSpacing:-1}, welcomeCopy:{color:C.muted,fontSize:16,lineHeight:25,maxWidth:310}, welcomeBottom:{padding:24,gap:20,marginTop:'auto'}, textButton:{alignItems:'center',justifyContent:'center',flexDirection:'row',gap:6,padding:8}, textButtonLabel:{color:C.mint,fontSize:14,fontWeight:'800'}, onboardScroll:{padding:24,paddingTop:32,gap:17,paddingBottom:45}, onboardKicker:{color:C.mint,fontSize:11,fontWeight:'900',letterSpacing:1.5,marginTop:8}, onboardTitle:{color:C.warm,fontSize:32,lineHeight:38,fontWeight:'900',letterSpacing:-.7}, onboardCopy:{color:C.muted,fontSize:15,lineHeight:23,marginBottom:5}, field:{gap:6}, fieldLabel:{color:C.muted,fontSize:10,fontWeight:'900',letterSpacing:1}, fieldInput:{borderBottomWidth:1,borderColor:C.line,color:C.warm,paddingVertical:12,fontSize:16}, bioInput:{minHeight:82,textAlignVertical:'top',borderWidth:1,borderRadius:12,paddingHorizontal:12}, choiceWrap:{flexDirection:'row',flexWrap:'wrap',gap:8}, choice:{paddingVertical:10,paddingHorizontal:12,borderWidth:1,borderColor:C.line,borderRadius:10,flexDirection:'row',gap:6,alignItems:'center'}, choiceActive:{backgroundColor:C.mint,borderColor:C.mint}, choiceText:{color:C.muted,fontSize:13,fontWeight:'800'}, choiceTextActive:{color:C.ink}, statusNote:{color:C.gold,fontSize:13,lineHeight:19,backgroundColor:'#312b20',padding:12,borderRadius:10}, skip:{alignItems:'center',padding:7}, preferenceNote:{flexDirection:'row',gap:8,alignItems:'center',padding:10,backgroundColor:'#163636',borderWidth:1,borderColor:'#326d60',borderRadius:11}, preferenceText:{color:C.warm,fontSize:12,flex:1,lineHeight:17}, privacyAction:{flexDirection:'row',alignItems:'center',gap:12,padding:14,borderWidth:1,borderColor:C.line,borderRadius:15}, photoRow:{flexDirection:'row',alignItems:'center',gap:14,padding:14,backgroundColor:C.raised,borderRadius:14,borderWidth:1,borderColor:C.line}, journalScroll:{backgroundColor:'#151d2b'}, journalNew:{backgroundColor:C.mint,padding:14,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, journalEmpty:{minHeight:220,justifyContent:'center',alignItems:'center',gap:12,borderTopWidth:1,borderBottomWidth:1,borderColor:'#4d4a40',paddingHorizontal:36}, journalEntry:{backgroundColor:'#20263a',padding:18,gap:11,borderLeftWidth:2,borderColor:C.gold}, journalMood:{color:C.gold,fontSize:12,fontWeight:'800'}, journalBody:{color:C.warm,fontSize:16,lineHeight:25}, journalSheet:{backgroundColor:'#252b3a'}, moodRow:{flexDirection:'row',gap:7,flexWrap:'wrap'}, journalInput:{minHeight:190,color:C.warm,fontSize:17,lineHeight:26,textAlignVertical:'top',paddingVertical:10,borderBottomWidth:1,borderColor:'#665f4f'},
   splashSafe:{flex:1,backgroundColor:'#0b1420'}, splashBg:{position:'absolute',top:0,left:0,right:0,bottom:0,backgroundColor:'#0b1420'}, splashBgAccent:{position:'absolute',top:'-20%',left:'-10%',right:'-10%',height:'70%',borderRadius:500,backgroundColor:'#112040',opacity:.7}, splashContent:{flex:1,alignItems:'center',justifyContent:'center',gap:14,paddingHorizontal:32}, splashStar:{position:'absolute',width:3,height:3,borderRadius:2,backgroundColor:C.warm}, splashLogoWrap:{height:130,width:130,alignItems:'center',justifyContent:'center',marginBottom:4}, splashRing:{position:'absolute',width:130,height:130,borderRadius:65,borderWidth:2,borderColor:C.mint}, splashIconOuter:{alignItems:'center',justifyContent:'center'}, splashIconBg:{position:'absolute',width:72,height:72,borderRadius:36,backgroundColor:'rgba(93,224,166,0.12)'}, splashIcon:{fontSize:44,textShadowColor:C.mint,textShadowRadius:18}, splashBrand:{color:C.warm,fontSize:22,fontWeight:'900',letterSpacing:4,marginTop:2}, splashTagline:{color:C.muted,fontSize:13,textAlign:'center',letterSpacing:.4}, splashMsgWrap:{borderTopWidth:1,borderColor:'#1f3050',paddingTop:20,alignItems:'center',minHeight:68,justifyContent:'center'}, splashMsg:{color:C.warm,fontSize:17,lineHeight:26,textAlign:'center',fontStyle:'italic',fontWeight:'600',letterSpacing:.2}, splashDots:{flexDirection:'row',gap:8,marginTop:10}, splashDot:{width:7,height:7,borderRadius:4,backgroundColor:C.mint},
   readingsEntry:{flexDirection:'row',alignItems:'center',gap:13,padding:14,backgroundColor:C.surface,borderRadius:16,borderWidth:1,borderColor:'rgba(93,224,166,.3)'},

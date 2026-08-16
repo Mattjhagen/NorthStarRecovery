@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    width: 2048px; height: 2732px;
+    background: #101827;
+    font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    overflow: hidden;
+  }
+  .status-bar {
+    height: 60px; background: #101827;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 60px;
+  }
+  .status-time { color: #F4F1E8; font-size: 34px; font-weight: 700; }
+  .header {
+    background: #192438; padding: 32px 60px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #34445d;
+  }
+  .logo-text { color: #F4F1E8; font-size: 42px; font-weight: 800; }
+  .star { color: #5DE0A6; font-size: 52px; margin-right: 18px; }
+
+  .content { padding: 50px 60px; display: flex; flex-direction: column; gap: 30px; }
+
+  .location-row {
+    display: flex; align-items: center; gap: 16px;
+    padding: 22px 0; border-bottom: 1px solid #34445d;
+  }
+  .location-text { color: #F4F1E8; font-size: 32px; flex: 1; }
+  .change-text { color: #5DE0A6; font-size: 30px; font-weight: 700; }
+
+  .search-bar {
+    background: #192438; border-radius: 20px; border: 1px solid #34445d;
+    display: flex; align-items: center; gap: 20px; padding: 28px 36px;
+  }
+  .search-input {
+    flex: 1; color: #9DADC5; font-size: 32px;
+  }
+
+  .filter-row { display: flex; gap: 16px; }
+  .chip {
+    padding: 18px 34px; border-radius: 50px;
+    font-size: 28px; font-weight: 700; border: 2px solid #34445d;
+    color: #9DADC5; background: transparent;
+  }
+  .chip.active { background: #5DE0A6; border-color: #5DE0A6; color: #101827; }
+
+  .pref-bar {
+    background: #162438; border-radius: 16px; border-left: 3px solid #5DE0A6;
+    padding: 20px 28px; display: flex; align-items: center; gap: 16px;
+  }
+  .pref-text { color: #F4F1E8; font-size: 28px; }
+
+  .meeting-card {
+    background: #192438; border-radius: 28px; padding: 44px 52px;
+    border: 1px solid #34445d; display: flex; gap: 36px;
+  }
+  .meeting-time {
+    min-width: 130px; display: flex; flex-direction: column; align-items: center;
+    padding-top: 6px;
+  }
+  .time-text { color: #F4F1E8; font-size: 42px; font-weight: 800; }
+  .time-zone { color: #9DADC5; font-size: 24px; }
+  .meeting-body { flex: 1; }
+  .meeting-title { color: #F4F1E8; font-size: 46px; font-weight: 800; margin-bottom: 10px; }
+  .meeting-meta { color: #9DADC5; font-size: 28px; margin-bottom: 6px; }
+  .meeting-lang { color: #9DADC5; font-size: 26px; margin-bottom: 22px; }
+  .inline-action {
+    display: inline-flex; align-items: center; gap: 12px;
+    padding-top: 16px; border-top: 1px solid #34445d; width: 100%;
+  }
+  .inline-text { color: #5DE0A6; font-size: 28px; font-weight: 800; flex: 1; }
+
+  .format-badge {
+    display: inline-block; padding: 8px 20px; border-radius: 8px; font-size: 22px; font-weight: 700;
+    margin-right: 10px;
+  }
+  .badge-remote { background: #1a3a4a; color: #75B8FF; }
+  .badge-inperson { background: #1f2e1a; color: #5DE0A6; }
+  .badge-hybrid { background: #2a2030; color: #B07FFF; }
+
+  .tab-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: #192438; border-top: 1px solid #34445d;
+    display: flex; height: 120px; padding-bottom: 20px;
+  }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+  .tab-text { font-size: 22px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="status-bar">
+  <div class="status-time">9:41</div>
+  <div style="display:flex;align-items:center;gap:20px;">
+    <svg width="40" height="28" viewBox="0 0 40 28" fill="none">
+      <rect x="1" y="7" width="6" height="14" rx="1.5" fill="#F4F1E8"/>
+      <rect x="10" y="4" width="6" height="17" rx="1.5" fill="#F4F1E8"/>
+      <rect x="19" y="1" width="6" height="20" rx="1.5" fill="#F4F1E8"/>
+      <rect x="28" y="1" width="9" height="20" rx="1.5" fill="#F4F1E8" opacity="0.3"/>
+    </svg>
+    <div style="background:#2a3f5a;border-radius:12px;padding:8px 18px;">
+      <span style="color:#5DE0A6;font-size:26px;font-weight:700;">85%</span>
+    </div>
+  </div>
+</div>
+
+<div class="header">
+  <div style="display:flex;align-items:center;">
+    <span class="star">✦</span>
+    <div class="logo-text">Find a Meeting</div>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- Location -->
+  <div class="location-row">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2" stroke-linecap="round">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+    </svg>
+    <div class="location-text">Near Austin, Texas</div>
+    <div class="change-text">Change</div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-bar">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <div class="search-input">Search meetings or places</div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-row">
+    <div class="chip active">All</div>
+    <div class="chip">Remote</div>
+    <div class="chip">In-person</div>
+    <div class="chip">Hybrid</div>
+  </div>
+
+  <!-- Preference note -->
+  <div class="pref-bar">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2" stroke-linecap="round">
+      <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/>
+    </svg>
+    <div class="pref-text">Your preference: All groups.</div>
+  </div>
+
+  <!-- Meeting 1 -->
+  <div class="meeting-card">
+    <div class="meeting-time">
+      <div class="time-text">7:00</div>
+      <div class="time-zone">PM · local</div>
+    </div>
+    <div class="meeting-body">
+      <div class="meeting-title">Night Lanterns</div>
+      <div class="meeting-meta">
+        <span class="format-badge badge-remote">Remote</span>
+        Online · Central
+      </div>
+      <div class="meeting-lang">English</div>
+      <div class="inline-action">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2.5" stroke-linecap="round">
+          <path d="M23 7 16 12 23 17V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+        </svg>
+        <div class="inline-text">Join room</div>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2.5" stroke-linecap="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meeting 2 -->
+  <div class="meeting-card">
+    <div class="meeting-time">
+      <div class="time-text">6:15</div>
+      <div class="time-zone">PM · local</div>
+    </div>
+    <div class="meeting-body">
+      <div class="meeting-title">A New Direction</div>
+      <div class="meeting-meta">
+        <span class="format-badge badge-inperson">In-person</span>
+        Austin · 2.1 mi
+      </div>
+      <div class="meeting-lang">English</div>
+      <div class="inline-action">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2.5" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+        </svg>
+        <div class="inline-text">Get directions</div>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2.5" stroke-linecap="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meeting 3 -->
+  <div class="meeting-card">
+    <div class="meeting-time">
+      <div class="time-text">8:00</div>
+      <div class="time-zone">PM · local</div>
+    </div>
+    <div class="meeting-body">
+      <div class="meeting-title">Open Sky</div>
+      <div class="meeting-meta">
+        <span class="format-badge badge-hybrid">Hybrid</span>
+        Chicago · Lakeview
+      </div>
+      <div class="meeting-lang">English / Español</div>
+      <div class="inline-action">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2.5" stroke-linecap="round">
+          <path d="M23 7 16 12 23 17V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+        </svg>
+        <div class="inline-text">Join room</div>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2.5" stroke-linecap="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meeting 4 -->
+  <div class="meeting-card">
+    <div class="meeting-time">
+      <div class="time-text">9:00</div>
+      <div class="time-zone">PM · local</div>
+    </div>
+    <div class="meeting-body">
+      <div class="meeting-title">Day by Day</div>
+      <div class="meeting-meta">
+        <span class="format-badge badge-remote">Remote</span>
+        Online · Pacific
+      </div>
+      <div class="meeting-lang">English</div>
+      <div class="inline-action">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2.5" stroke-linecap="round">
+          <path d="M23 7 16 12 23 17V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+        </svg>
+        <div class="inline-text">Join room</div>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2.5" stroke-linecap="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+    </svg>
+    <div class="tab-text" style="color:#9DADC5;">Today</div>
+  </div>
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+    </svg>
+    <div class="tab-text" style="color:#5DE0A6;">Meetings</div>
+  </div>
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </svg>
+    <div class="tab-text" style="color:#9DADC5;">Learn</div>
+  </div>
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+    <div class="tab-text" style="color:#9DADC5;">Connect</div>
+  </div>
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+    </svg>
+    <div class="tab-text" style="color:#9DADC5;">Calm</div>
+  </div>
+  <div class="tab">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+    </svg>
+    <div class="tab-text" style="color:#9DADC5;">You</div>
+  </div>
+</div>
+
+</body>
+</html>
