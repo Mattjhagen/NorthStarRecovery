@@ -8,6 +8,9 @@ import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import * as QuickActions from 'expo-quick-actions';
+import * as Location from 'expo-location';
+import * as Application from 'expo-application';
+import * as Clipboard from 'expo-clipboard';
 import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, cancelMeetingReminders, sendLocalNotification, getRemotePushToken } from './notifications';
 import { READINGS } from './readings';
 import { createAccount, confirmAccount, signInWithPassword, restoreSignedInUser, signOutEverywhere } from './auth';
@@ -128,23 +131,40 @@ async function fetchCMAMeetings() {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         return data
-          .filter(m => m.conference_url || m.types?.some(t => ['online', 'ONL', 'TC', 'VM'].includes(t)))
-          .slice(0, 60)
-          .map((m, i) => ({
-            id: m.slug || `mg-${i}`,
-            title: m.name,
-            time: to12Hour(m.time),
-            day: m.day !== undefined ? DAYS[m.day] : 'Daily',
-            format: 'Remote',
-            region: m.region || m.city || 'Online',
-            language: m.language || 'English',
-            url: m.conference_url || 'https://www.crystalmeth.org/meetings/?type=online',
-            action: 'Join meeting',
-          }));
+          .slice(0, 400)
+          .map((m, i) => {
+            const online = !!m.conference_url || m.types?.some(x => ['online', 'ONL', 'TC', 'VM'].includes(x));
+            const hybrid = m.types?.includes('HY') || (online && m.address);
+            const format = hybrid ? 'Hybrid' : online ? 'Remote' : 'In-person';
+            const lat = parseFloat(m.latitude), lng = parseFloat(m.longitude);
+            return {
+              id: m.slug || `mg-${i}`,
+              title: m.name,
+              time: to12Hour(m.time),
+              day: m.day !== undefined ? DAYS[m.day] : 'Daily',
+              format,
+              region: m.region || m.city || (online ? 'Online' : ''),
+              language: m.language || 'English',
+              lat: Number.isFinite(lat) ? lat : null,
+              lng: Number.isFinite(lng) ? lng : null,
+              url: m.conference_url || (Number.isFinite(lat) ? `https://maps.apple.com/?ll=${lat},${lng}&q=${encodeURIComponent(m.name)}` : 'https://www.crystalmeth.org/meetings/'),
+              notes: m.conference_url_notes || '',
+              searchText: [m.name, m.region, m.city, m.address, m.location, m.group, m.language].filter(Boolean).join(' ').toLowerCase(),
+              passcode: /PW:?\s*(\S+)/i.exec(m.conference_url_notes || '')?.[1] || '',
+              action: online ? 'Join meeting' : 'Directions',
+            };
+          });
       }
     }
   } catch {}
   return FALLBACK_MEETINGS;
+}
+
+function distanceKm(lat1, lng1, lat2, lng2) {
+  const r=6371, p1=lat1*Math.PI/180, p2=lat2*Math.PI/180;
+  const dp=(lat2-lat1)*Math.PI/180, dl=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return 2*r*Math.asin(Math.sqrt(a));
 }
 
 function nextMeeting(meetings) {
@@ -282,6 +302,7 @@ function AppInner() {
   const calmPlayer = useAudioPlayer(soundscapeUri(currentSoundscape.name));
 
   const [authEmail, setAuthEmail] = useState('');
+  const [sosEnabled, setSosEnabled] = useState(false);
   useEffect(() => { restoreSignedInUser().then(u => setAuthState(u ? 'authenticated' : 'onboarding')).catch(() => setAuthState('onboarding')); }, []);
   useEffect(() => {
     if (authState !== 'authenticated') return;
@@ -351,7 +372,30 @@ function AppInner() {
     getRemotePushToken('e2814d89-03ca-4798-a753-a56b695364f5').then(token => {
       if (token) apiRequest('/v1/push-tokens',{method:'POST',body:JSON.stringify({token})}).catch(()=>{});
     });
+    (async () => {
+      try {
+        const deviceId = Platform.OS==='ios' ? await Application.getIosIdForVendorAsync() : Application.getAndroidId();
+        if (deviceId) await apiRequest('/v1/me/device',{method:'POST',body:JSON.stringify({deviceId})});
+      } catch {}
+    })();
+    apiRequest('/v1/me').then(d=>{ if(d?.profile?.sosOptIn) setSosEnabled(true); }).catch(()=>{});
   }, [authState]);
+
+  const toggleSos = async val => {
+    if (!isBackendConfigured()) { say('Nearby support needs a connection.'); return; }
+    if (val) {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') { say('Allow location access in Settings to enable nearby support.'); return; }
+      try {
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        await apiRequest('/v1/me/location',{method:'POST',body:JSON.stringify({lat:pos.coords.latitude,lng:pos.coords.longitude,sosOptIn:true})});
+        setSosEnabled(true); say('Nearby support is on. Only a coarse, city-level location is stored.');
+      } catch { say('Could not enable nearby support right now.'); }
+    } else {
+      try { await apiRequest('/v1/me/location',{method:'POST',body:JSON.stringify({sosOptIn:false})}); } catch {}
+      setSosEnabled(false); say('Nearby support is off.');
+    }
+  };
 
   const say = msg => { setToast(msg); setTimeout(()=>setToast(''), 2600); };
   const support = () => Alert.alert('Need support now?','This opens your phone app to contact urgent support. Northstar is not emergency care.',[{text:'Not now',style:'cancel'},{text:'Open phone',onPress:()=>Linking.openURL('tel:988')}]);
@@ -406,14 +450,14 @@ function AppInner() {
         </View>
       </View>
       <View style={styles.body}>
-        {tab==='Today'    && <Today say={say} go={setTab} profile={profile} sobrietyDays={sobrietyDays} meetings={meetings}/>}
+        {tab==='Today'    && <Today say={say} go={setTab} profile={profile} sobrietyDays={sobrietyDays} meetings={meetings} sosEnabled={sosEnabled}/>}
         {tab==='Meetings' && <Meetings say={say} profile={profile} meetings={meetings} loading={!cmaLoaded}/>}
         {tab==='Learn'    && <Learn say={say} onReadings={()=>setReadingsOpen(true)} news={recoveryNews}/>}
         <View style={[styles.calmTab, tab!=='Calm'&&styles.hidden]}>
           <Calm player={calmPlayer} soundscape={currentSoundscape} soundscapes={SOUNDSCAPES} onSelectSoundscape={setCurrentSoundscape}/>
         </View>
         {tab==='Connect'  && <Connect say={say}/>}
-        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={authEmail.toLowerCase()==='matty@purepulse.one'}/>}
+        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={authEmail.toLowerCase()==='matty@purepulse.one'} sosEnabled={sosEnabled} onToggleSos={toggleSos}/>}
         {tab==='Journal'  && <Journal say={say} entries={journalEntries} onAdd={addJournalEntry}/>}
       </View>
       <View style={styles.tabbar}>
@@ -622,7 +666,27 @@ function Onboarding({ onComplete }) {
 }
 
 // ─── TODAY ────────────────────────────────────────────────────────────────────
-function Today({ say, go, profile, sobrietyDays, meetings }) {
+function Today({ say, go, profile, sobrietyDays, meetings, sosEnabled }) {
+  const sendSos = () => {
+    if (!sosEnabled) {
+      Alert.alert('Nearby support is off','Turn on "Nearby support (SOS)" in the You tab first — it lets members near you know when someone needs help, and lets you reach them too.',[{text:'OK'}]);
+      return;
+    }
+    const fire = async radiusKm => {
+      try {
+        const r = await apiRequest('/v1/sos',{method:'POST',body:JSON.stringify({radiusKm})});
+        say(r.alerted>0?`${r.alerted} nearby member${r.alerted===1?'':'s'} alerted. You are not alone.`:'No opted-in members in range right now — try 988 or your sponsor.');
+      } catch (e) {
+        say(String(e?.message||'').includes('rate')?'SOS was sent recently. Give it a few minutes.':'Could not send SOS. Try 988 or your sponsor.');
+      }
+    };
+    Alert.alert('Send SOS to nearby members?','Members who opted into nearby support within your chosen radius get a push notification that you need help. Your exact location is never shared.',[
+      {text:'Cancel',style:'cancel'},
+      {text:'10 mi',onPress:()=>fire(16)},
+      {text:'25 mi',onPress:()=>fire(40)},
+      {text:'50 mi',onPress:()=>fire(80)},
+    ]);
+  };
   const name = profile.pseudonym || 'friend';
   const next = nextMeeting(meetings);
   const hour = new Date().getHours();
@@ -709,6 +773,9 @@ function Today({ say, go, profile, sobrietyDays, meetings }) {
         <Pressable onPress={()=>go('Learn')} style={styles.inlineAction}><Icon name="sparkles-outline" color={C.gold}/><Text style={styles.inlineText}>Learn by living it</Text></Pressable>
         <Pressable onPress={()=>go('Calm')} style={styles.inlineAction}><Icon name="headset-outline" color={C.blue}/><Text style={styles.inlineText}>Calm soundscapes</Text></Pressable>
       </Card>
+      <Pressable style={[styles.support,{borderColor:'#8a4444'}]} onPress={sendSos}>
+        <Icon name="alert-circle" size={17} color="#ff8a80"/><Text style={[styles.supportText,{color:'#ff8a80'}]}>SOS — alert nearby members</Text><Icon name="navigate-outline" size={16} color="#ff8a80"/>
+      </Pressable>
       <Pressable style={styles.support} onPress={helpNow}>
         <Icon name="heart" size={17} color={C.gold}/><Text style={styles.supportText}>{hasSponsor ? `Reach out to ${profile.sponsor.name}` : 'Need support now?'}</Text><Icon name={hasSponsor ? 'call-outline' : 'heart-outline'} size={16} color={C.gold}/>
       </Pressable>
@@ -721,7 +788,25 @@ function Meetings({ say, profile, meetings, loading }) {
   const [filter, setFilter] = useState('All');
   const [query, setQuery] = useState('');
   const [roomUrl, setRoomUrl] = useState(null);
-  const shown = meetings.filter(m=>(filter==='All'||m.format===filter)&&`${m.title} ${m.region} ${m.day}`.toLowerCase().includes(query.toLowerCase()));
+  const [coords, setCoords] = useState(null);
+  const nearMe = async () => {
+    if (coords) { setCoords(null); return; }
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') { say('Allow location access in Settings to sort by distance.'); return; }
+    try {
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      say('Sorted by distance.');
+    } catch { say('Could not read your location right now.'); }
+  };
+  const q = query.trim().toLowerCase();
+  let shown = meetings.filter(m=>(filter==='All'||m.format===filter)&&(!q||(m.searchText||`${m.title} ${m.region} ${m.day}`.toLowerCase()).includes(q)));
+  if (coords) {
+    shown = shown
+      .map(m=>({ ...m, distanceMi: m.lat!=null ? distanceKm(coords.lat,coords.lng,m.lat,m.lng)*0.621371 : null }))
+      .sort((a,b)=>(a.distanceMi??1e9)-(b.distanceMi??1e9));
+  }
+  shown = shown.slice(0, 80);
   const meetNow = nextMeeting(meetings);
 
   const openRoom = () => {
@@ -768,16 +853,22 @@ function Meetings({ say, profile, meetings, loading }) {
         {['All','Remote','In-person','Hybrid'].map(x=><Pressable key={x} onPress={()=>setFilter(x)} style={[styles.segment,filter===x&&styles.segmentActive]}><Text style={[styles.segmentText,filter===x&&styles.segmentTextActive]}>{x}</Text></Pressable>)}
       </ScrollView>
       {loading&&<View style={{alignItems:'center',padding:20}}><ActivityIndicator color={C.mint}/><Text style={[styles.muted,{marginTop:8}]}>Loading CMA meetings…</Text></View>}
+      <Pressable onPress={nearMe} style={[styles.visualChoice,coords&&styles.visualChoiceActive]}><Icon name="navigate-outline" size={15} color={coords?C.ink:C.muted}/><Text style={[styles.visualText,coords&&styles.visualTextActive]}>{coords?'Sorted by distance · tap to clear':'Sort by distance from me'}</Text></Pressable>
       <Text style={styles.results}>{shown.length} meeting{shown.length!==1?'s':''} found</Text>
       {shown.map(m=>(
         <Card key={m.id} style={styles.meeting}>
           <View style={styles.time}><Text style={styles.timeText}>{m.time}</Text><Text style={styles.timeZone}>{m.day||'daily'}</Text></View>
           <View style={{flex:1}}>
             <Text style={styles.cardTitle}>{m.title}</Text>
-            <Text style={styles.meetingMeta}>{m.format} · {m.region}</Text>
+            <Text style={styles.meetingMeta}>{m.format} · {m.region}{m.distanceMi!=null?` · ${m.distanceMi<10?m.distanceMi.toFixed(1):Math.round(m.distanceMi)} mi`:''}</Text>
             <Text style={styles.muted}>{m.language}</Text>
-            <Pressable onPress={()=>m.url?openWeb(m.url):say('No link available')} style={styles.inlineAction}>
-              <Text style={styles.inlineText}>{m.action}</Text>
+            {m.notes?<Text style={[styles.muted,{fontSize:12}]}>{m.notes}</Text>:null}
+            <Pressable onPress={()=>{
+              if (!m.url) return say('No link available');
+              if (m.passcode) { Clipboard.setStringAsync(m.passcode).catch(()=>{}); say(`Passcode ${m.passcode} copied — paste it if Zoom asks.`); }
+              openWeb(m.url);
+            }} style={styles.inlineAction}>
+              <Text style={styles.inlineText}>{m.action}{m.passcode?` · PW ${m.passcode}`:''}</Text>
               <Icon name={m.format==='Remote'?'videocam-outline':'navigate-outline'} size={16} color={C.mint}/>
             </Pressable>
           </View>
@@ -1109,7 +1200,7 @@ function Connect({ say }) {
       if (!data?.posts) return;
       setPosts(data.posts.map(p => ({
         id:p.id, author:p.mine?'You':p.author, authorId:p.authorId, initial:(p.mine?'Y':p.author.charAt(0)).toUpperCase(),
-        avatar:p.avatar||'', category:p.category, time:timeAgo(p.createdAt), body:p.body, bio:p.bio||'', comments:[], commentCount:p.commentCount||0,
+        avatar:p.avatar||'', following:!!p.following, category:p.category, time:timeAgo(p.createdAt), body:p.body, bio:p.bio||'', comments:[], commentCount:p.commentCount||0,
       })));
     }).catch(()=>{});
   };
@@ -1158,6 +1249,23 @@ function Connect({ say }) {
     } else { applyLocal({id:`local-${Date.now()}`,author:'You',body:text}); say('Comment added.'); }
   };
 
+  const [sponsorsOpen, setSponsorsOpen] = useState(false);
+  const [sponsors, setSponsors] = useState([]);
+  const openSponsors = () => {
+    setSponsorsOpen(true);
+    if (!online) return;
+    apiRequest('/v1/sponsors').then(d=>setSponsors(d.sponsors||[])).catch(()=>say('Could not load sponsors.'));
+  };
+  const toggleFollow = target => {
+    if (!online || !target.authorId) return;
+    const next = !target.following;
+    setPosts(p=>p.map(x=>x.authorId===target.authorId?{...x,following:next}:x));
+    setMember(m=>m&&m.authorId===target.authorId?{...m,following:next}:m);
+    apiRequest('/v1/follows',{method:'POST',body:JSON.stringify({memberId:target.authorId,following:next})})
+      .then(()=>say(next?`Following ${target.author}.`:`Unfollowed ${target.author}.`))
+      .catch(()=>{});
+  };
+
   const openDm = target => {
     setMember(null); setDm(target); setDmMessages([]); setDmThread(null);
     if (!online || !target.authorId) return;
@@ -1186,15 +1294,39 @@ function Connect({ say }) {
       <Text style={styles.intro}>Questions, stories, and small truths — held with care.</Text>
       <View style={styles.standard}><Icon name="shield-checkmark" color={C.mint}/><Text style={styles.standardText}>No advice as authority. No pressure to share. If someone feels unsafe, block and report.</Text></View>
       <Pressable style={styles.compose} onPress={()=>setCompose(true)}><Icon name="create-outline" color={C.ink}/><Text style={styles.composeText}>Share with the circle</Text></Pressable>
+      <Pressable onPress={openSponsors} style={styles.soundscapePicker}>
+        <Icon name="hand-left-outline" color={C.mint}/>
+        <View style={{flex:1}}><Text style={styles.cardTitle}>Find a sponsor</Text><Text style={styles.muted}>Members who volunteered to walk alongside you.</Text></View>
+        <Icon name="chevron-forward" size={16} color={C.muted}/>
+      </Pressable>
       {visiblePosts.map(post=>(
         <Card key={post.id} style={styles.boardPost}>
           <View style={styles.rowBetween}><Text style={styles.topic}>{post.category}</Text><Text style={styles.postTime}>{post.time}</Text></View>
-          <View style={styles.postHead}><Pressable onPress={()=>setMember(post)}>{post.avatar?<Image source={{uri:post.avatar}} style={styles.avatarImg}/>:<View style={styles.avatar}><Text style={styles.avatarText}>{post.initial}</Text></View>}</Pressable><Pressable onPress={()=>setMember(post)}><Text style={styles.cardTitle}>{post.author}</Text><Text style={styles.tapHint}>Tap to view profile</Text></Pressable></View>
+          <View style={styles.postHead}><Pressable onPress={()=>setMember(post)}>{post.avatar?<Image source={{uri:post.avatar}} style={styles.avatarImg}/>:<View style={styles.avatar}><Text style={styles.avatarText}>{post.initial}</Text></View>}</Pressable><Pressable onPress={()=>setMember(post)}><View style={{flexDirection:'row',alignItems:'center',gap:6}}><Text style={styles.cardTitle}>{post.author}</Text>{post.following?<Text style={{color:C.mint,fontSize:10,fontWeight:'900'}}>FOLLOWING</Text>:null}</View><Text style={styles.tapHint}>Tap to view profile</Text></Pressable></View>
           <Pressable onPress={()=>openPost(post)}><Text style={styles.postText}>{post.body}</Text></Pressable>
           <Pressable onPress={()=>openPost(post)} style={styles.commentAction}><Icon name="chatbubble-ellipses-outline" color={C.mint}/><Text style={styles.commentActionText}>{Math.max(post.commentCount||0,post.comments.length)} {Math.max(post.commentCount||0,post.comments.length)===1?'comment':'comments'} · join gently</Text><Icon name="chevron-forward" size={15} color={C.muted}/></Pressable>
         </Card>
       ))}
       {visiblePosts.length===0&&<View style={styles.boardEmpty}><Icon name="shield-outline" size={31} color={C.mint}/><Text style={styles.cardTitle}>Your circle is quiet.</Text></View>}
+      <Modal visible={sponsorsOpen} animationType="slide">
+        <SafeAreaView style={[styles.safe,{backgroundColor:'#141f31'}]}>
+          <View style={[styles.header,{height:60}]}>
+            <Text style={styles.sheetTitle}>Available sponsors</Text>
+            <Pressable onPress={()=>setSponsorsOpen(false)}><Icon name="close" color={C.warm}/></Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{padding:16,gap:10}}>
+            {!online&&<Text style={styles.muted}>Connect to the internet to see available sponsors.</Text>}
+            {online&&sponsors.length===0&&<Text style={styles.muted}>No members are listed as available sponsors yet. You can volunteer in the You tab.</Text>}
+            {sponsors.map(s=>(
+              <Pressable key={s.memberId} onPress={()=>{setSponsorsOpen(false);setMember({author:s.author,authorId:s.memberId,avatar:s.avatar,bio:s.note||s.bio,initial:s.author.charAt(0).toUpperCase()});}} style={styles.soundscapeRow}>
+                {s.avatar?<Image source={{uri:s.avatar}} style={styles.avatarImg}/>:<View style={styles.avatar}><Text style={styles.avatarText}>{s.author.charAt(0).toUpperCase()}</Text></View>}
+                <View style={{flex:1}}><Text style={styles.cardTitle}>{s.author}</Text><Text style={styles.muted} numberOfLines={2}>{s.note||s.bio||'Here to help.'}</Text></View>
+                <Icon name="chevron-forward" size={16} color={C.muted}/>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
       <Modal visible={compose} transparent animationType="slide">
         <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1}}><Pressable style={styles.modalBack} onPress={()=>setCompose(false)}>
           <Pressable style={styles.sheet} onPress={()=>{}}>
@@ -1236,6 +1368,7 @@ function Connect({ say }) {
             {member&&<><View style={styles.handle}/>
               <View style={styles.memberHero}>{member.avatar?<Image source={{uri:member.avatar}} style={styles.memberAvatarImg}/>:<View style={styles.memberAvatar}><Text style={styles.bigAvatarText}>{member.initial}</Text></View>}<View style={{flex:1}}><Text style={styles.sheetTitle}>{member.author}</Text><Text style={styles.muted}>Member profile</Text></View></View>
               <Text style={styles.sheetCopy}>{member.bio||'No bio.'}</Text>
+              {member.authorId?<Button label={member.following?'Following ✓':'Follow'} onPress={()=>toggleFollow(member)} kind={member.following?'dark':undefined} icon={member.following?'checkmark':'person-add-outline'}/>:null}
               <Button label="Message privately" onPress={()=>openDm(member)} icon="chatbubble-outline"/>
               <Pressable style={styles.dangerAction} onPress={()=>blockMember(member)}><Icon name="eye-off-outline" color={C.gold}/><Text style={styles.dangerText}>Block member</Text></Pressable>
             </>}
@@ -1329,7 +1462,12 @@ function SupportNorthstar({ say }) {
 }
 
 // ─── YOU ──────────────────────────────────────────────────────────────────────
-function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries, saveProfile, isAdmin }) {
+function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries, saveProfile, isAdmin, sosEnabled, onToggleSos }) {
+  const [adminOpen, setAdminOpen] = useState(false);
+  const toggleSponsorAvailable = val => {
+    saveProfile({ ...profile, sponsorAvailable: val });
+    say(val?'You are listed as an available sponsor.':'You are no longer listed as a sponsor.');
+  };
   const [prefs, setPrefs] = useState({ meetings:true, insight:false, checkin:false, circleNotifs:true });
   const name = profile.pseudonym || 'Northstar member';
   const hasSponsor = profile.sponsor?.name;
@@ -1445,6 +1583,23 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
         <View style={{flex:1}}><Text style={styles.cardTitle}>Anonymous mode</Text><Text style={styles.muted}>Hide your profile from community search.</Text></View>
         <Switch value={!!profile.privacyMode} onValueChange={togglePrivacy} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={profile.privacyMode?C.mint:C.muted}/>
       </View>
+
+      <View style={styles.setting}>
+        <Icon name="navigate-outline" color={C.muted}/>
+        <View style={{flex:1}}><Text style={styles.cardTitle}>Nearby support (SOS)</Text><Text style={styles.muted}>Share a coarse, city-level location so you can send and receive nearby SOS alerts.</Text></View>
+        <Switch value={!!sosEnabled} onValueChange={onToggleSos} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={sosEnabled?C.mint:C.muted}/>
+      </View>
+      <View style={styles.setting}>
+        <Icon name="hand-left-outline" color={C.muted}/>
+        <View style={{flex:1}}><Text style={styles.cardTitle}>Available to sponsor</Text><Text style={styles.muted}>List yourself in the sponsor directory so members can reach out.</Text></View>
+        <Switch value={!!profile.sponsorAvailable} onValueChange={toggleSponsorAvailable} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={profile.sponsorAvailable?C.mint:C.muted}/>
+      </View>
+
+      {isAdmin&&<>
+        <Text style={styles.sectionTitle}>MODERATION</Text>
+        <Button label="Review reports" onPress={()=>setAdminOpen(true)} kind="dark" icon="shield-half-outline"/>
+        <AdminReports visible={adminOpen} onClose={()=>setAdminOpen(false)} say={say}/>
+      </>}
 
       <Text style={styles.sectionTitle}>YOUR NETWORK</Text>
       <Card>
@@ -1576,6 +1731,47 @@ function ReadingPlayer({ reading, onClose }) {
         </Pressable>
       </View>
     </View>
+  );
+}
+
+// ─── ADMIN ────────────────────────────────────────────────────────────────────
+function AdminReports({ visible, onClose, say }) {
+  const [reports, setReports] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const load = () => apiRequest('/v1/admin/reports').then(d=>setReports(d.reports||[])).catch(()=>say('Could not load reports.'));
+  useEffect(()=>{ if(visible) load(); },[visible]);
+  const act = async (label, path, payload) => {
+    setBusy(true);
+    try { await apiRequest(path,{method:'POST',body:JSON.stringify(payload)}); say(label); load(); }
+    catch { say('Action failed.'); }
+    setBusy(false);
+  };
+  return (
+    <Modal visible={visible} animationType="slide">
+      <SafeAreaView style={[styles.safe,{backgroundColor:'#141f31'}]}>
+        <View style={[styles.header,{height:60}]}>
+          <Text style={styles.sheetTitle}>Reports</Text>
+          <Pressable onPress={onClose}><Icon name="close" color={C.warm}/></Pressable>
+        </View>
+        <ScrollView contentContainerStyle={{padding:16,gap:10}}>
+          {reports.length===0&&<Text style={styles.muted}>No reports. The circle is quiet.</Text>}
+          {reports.map(r=>(
+            <Card key={r.id}>
+              <View style={styles.rowBetween}><Text style={styles.topic}>{r.targetType.toUpperCase()}</Text><Text style={styles.postTime}>{timeAgo(r.createdAt)}</Text></View>
+              {r.author?<Text style={styles.cardTitle}>{r.author}</Text>:null}
+              {r.snippet?<Text style={styles.muted}>“{r.snippet}”</Text>:null}
+              <Text style={styles.muted}>Reason: {r.reason||'member report'}</Text>
+              <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+                {r.targetType==='post'&&<Pressable disabled={busy} onPress={()=>act('Post removed.','/v1/admin/remove-post',{postId:r.targetId})} style={styles.dangerAction}><Icon name="trash-outline" color={C.gold} size={15}/><Text style={styles.dangerText}>Remove post</Text></Pressable>}
+                {r.authorId&&<Pressable disabled={busy} onPress={()=>act('Member suspended.','/v1/admin/ban',{memberId:r.authorId,banned:true})} style={styles.dangerAction}><Icon name="person-remove-outline" color={C.gold} size={15}/><Text style={styles.dangerText}>Suspend</Text></Pressable>}
+                {r.authorId&&<Pressable disabled={busy} onPress={()=>act('Member and device suspended.','/v1/admin/ban',{memberId:r.authorId,banned:true,banDevices:true})} style={styles.dangerAction}><Icon name="phone-portrait-outline" color={C.gold} size={15}/><Text style={styles.dangerText}>Suspend + device</Text></Pressable>}
+                {r.authorId&&<Pressable disabled={busy} onPress={()=>act('Member restored.','/v1/admin/ban',{memberId:r.authorId,banned:false})} style={[styles.dangerAction,{borderColor:'#3d9074'}]}><Icon name="refresh-outline" color={C.mint} size={15}/><Text style={[styles.dangerText,{color:C.mint}]}>Restore</Text></Pressable>}
+              </View>
+            </Card>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
   );
 }
 

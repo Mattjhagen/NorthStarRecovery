@@ -7,10 +7,11 @@ in request bodies are never trusted. Message and post bodies are never logged.
 import base64
 import hashlib
 import json
+import math
 import os
 import urllib.request
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -26,6 +27,7 @@ AVATAR_BUCKET = os.environ.get('AVATAR_BUCKET', '')
 AVATAR_BASE_URL = os.environ.get('AVATAR_BASE_URL', '')
 
 MOODS = ['heavy', 'tender', 'steady', 'hopeful']
+ADMIN_EMAILS = {e.strip().lower() for e in os.environ.get('ADMIN_EMAILS', '').split(',') if e.strip()}
 POST_CATEGORIES = ['QUESTION', 'STORY', 'CHECK-IN']
 EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 
@@ -65,8 +67,27 @@ def avatar_of(profile):
     return '' if profile.get('privacyMode') else (profile.get('avatarUrl') or '')
 
 
+def haversine_km(lat1, lng1, lat2, lng2):
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = math.radians(lat2 - lat1), math.radians(lng2 - lng1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
 def blocked_ids(profile):
     return set(profile.get('blockedIds') or [])
+
+
+def is_admin(claims):
+    for key in ('email', 'cognito:username', 'username'):
+        if str(claims.get(key, '')).lower() in ADMIN_EMAILS:
+            return True
+    return False
+
+
+def is_banned(profile):
+    return bool(profile.get('banned'))
 
 
 def thread_id_for(a, b):
@@ -89,14 +110,18 @@ def send_expo_push(token, title, body_text):
 
 def handle_posts(member_id, method, body):
     me = get_profile(member_id)
+    if method == 'POST' and is_banned(me):
+        return reply(403, {'error': 'account_restricted'})
     if method == 'GET':
         items = community.query(
             KeyConditionExpression=Key('pk').eq('FEED'),
             ScanIndexForward=False, Limit=50).get('Items', [])
         hidden = blocked_ids(me)
+        following = set(me.get('followingIds') or [])
         posts = [
             {
                 'id': i['postId'], 'author': i['pseudonym'], 'authorId': i['authorId'],
+                'following': i['authorId'] in following,
                 'avatar': i.get('authorAvatar', ''),
                 'bio': i.get('authorBio', ''), 'category': i['category'],
                 'body': i['body'], 'createdAt': i['createdAt'],
@@ -144,6 +169,8 @@ def handle_comments(member_id, method, post_id, body):
     if pointer is None:
         return reply(404, {'error': 'not_found'})
     me = get_profile(member_id)
+    if method == 'POST' and is_banned(me):
+        return reply(403, {'error': 'account_restricted'})
     if method == 'GET':
         items = community.query(
             KeyConditionExpression=Key('pk').eq(f'POST#{post_id}'),
@@ -241,6 +268,8 @@ def handle_messages(member_id, method, thread_id, body, query):
         if not (1 <= len(text) <= 2000):
             return reply(400, {'error': 'invalid_message'})
         me = get_profile(member_id)
+        if is_banned(me):
+            return reply(403, {'error': 'account_restricted'})
         peer = get_profile(membership['peerId'])
         if member_id in blocked_ids(peer) or membership['peerId'] in blocked_ids(me):
             return reply(403, {'error': 'messaging_unavailable'})
@@ -294,6 +323,151 @@ def handler(event, context):
     if params.get('threadId') is not None:
         return handle_messages(member_id, method, params['threadId'], body, query)
 
+    if path.startswith('/v1/admin/') :
+        if not is_admin(claims):
+            return reply(403, {'error': 'forbidden'})
+        if path == '/v1/admin/reports' and method == 'GET':
+            items = community.query(
+                KeyConditionExpression=Key('pk').eq('REPORT'),
+                ScanIndexForward=False, Limit=50).get('Items', [])
+            reports = []
+            for i in items:
+                entry = {
+                    'id': i['sk'], 'targetType': i['targetType'], 'targetId': i['targetId'],
+                    'reason': i.get('reason', ''), 'createdAt': i['createdAt'], 'reporterId': i['reporterId'],
+                }
+                if i['targetType'] == 'post':
+                    pointer = find_post(i['targetId'])
+                    if pointer:
+                        feed = community.get_item(Key={'pk': 'FEED', 'sk': pointer['feedSk']}).get('Item')
+                        if feed:
+                            entry['authorId'] = feed['authorId']
+                            entry['author'] = feed.get('pseudonym', '')
+                            entry['snippet'] = feed.get('body', '')[:140]
+                elif i['targetType'] == 'member':
+                    entry['authorId'] = i['targetId']
+                reports.append(entry)
+            return reply(200, {'reports': reports})
+        if path == '/v1/admin/ban' and method == 'POST':
+            target = str((body or {}).get('memberId') or '').strip()
+            banned = bool((body or {}).get('banned', True))
+            ban_devices = bool((body or {}).get('banDevices', False))
+            if not target or len(target) > 64:
+                return reply(400, {'error': 'invalid_member'})
+            profile = get_profile(target)
+            profile['banned'] = banned
+            profiles.put_item(Item=profile)
+            devices = profile.get('deviceIds') or []
+            if ban_devices and banned:
+                for device_id in devices:
+                    community.put_item(Item={'pk': 'BANNED_DEVICE', 'sk': device_id,
+                                             'memberId': target, 'createdAt': now_iso()})
+            if not banned:
+                for device_id in devices:
+                    community.delete_item(Key={'pk': 'BANNED_DEVICE', 'sk': device_id})
+            return reply(200, {'memberId': target, 'banned': banned, 'devicesBanned': len(devices) if ban_devices and banned else 0})
+        if path == '/v1/admin/remove-post' and method == 'POST':
+            target = str((body or {}).get('postId') or '').strip()
+            pointer = find_post(target)
+            if pointer is None:
+                return reply(404, {'error': 'not_found'})
+            community.delete_item(Key={'pk': 'FEED', 'sk': pointer['feedSk']})
+            community.delete_item(Key={'pk': f'POSTID#{target}', 'sk': 'POINTER'})
+            return reply(200, {'removed': target})
+        return reply(404, {'error': 'not_found'})
+
+    if path == '/v1/sponsors' and method == 'GET':
+        me = get_profile(member_id)
+        hidden = blocked_ids(me)
+        sponsors = []
+        scan_kwargs = {
+            'FilterExpression': 'sponsorAvailable = :t',
+            'ExpressionAttributeValues': {':t': True},
+        }
+        while True:
+            page = profiles.scan(**scan_kwargs)
+            for item in page.get('Items', []):
+                if item['memberId'] == member_id or item['memberId'] in hidden:
+                    continue
+                sponsors.append({
+                    'memberId': item['memberId'],
+                    'author': pseudonym_of(item),
+                    'avatar': avatar_of(item),
+                    'bio': (item.get('bio') or '')[:280],
+                    'note': (item.get('sponsorNote') or '')[:200],
+                })
+            if 'LastEvaluatedKey' not in page:
+                break
+            scan_kwargs['ExclusiveStartKey'] = page['LastEvaluatedKey']
+        return reply(200, {'sponsors': sponsors[:100]})
+
+    if path == '/v1/me/location' and method == 'POST':
+        opt_in = bool((body or {}).get('sosOptIn', False))
+        profile = get_profile(member_id)
+        if opt_in:
+            try:
+                lat, lng = float(body['lat']), float(body['lng'])
+                if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                    raise ValueError()
+            except (KeyError, TypeError, ValueError):
+                return reply(400, {'error': 'invalid_location'})
+            # Store coarse (~1 km) coordinates only; exact position never leaves the device.
+            profile['sosLat'] = str(round(lat, 2))
+            profile['sosLng'] = str(round(lng, 2))
+            profile['sosOptIn'] = True
+        else:
+            profile.pop('sosLat', None)
+            profile.pop('sosLng', None)
+            profile['sosOptIn'] = False
+        profiles.put_item(Item=profile)
+        return reply(200, {'sosOptIn': profile['sosOptIn']})
+
+    if path == '/v1/sos' and method == 'POST':
+        me = get_profile(member_id)
+        if not me.get('sosOptIn') or 'sosLat' not in me:
+            return reply(409, {'error': 'nearby_support_not_enabled'})
+        last = me.get('lastSosAt')
+        if last:
+            try:
+                prev = datetime.strptime(last[:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
+                if datetime.now(timezone.utc) - prev < timedelta(minutes=30):
+                    return reply(429, {'error': 'sos_rate_limited'})
+            except ValueError:
+                pass
+        try:
+            radius_km = min(160.0, max(1.0, float((body or {}).get('radiusKm', 40))))
+        except (TypeError, ValueError):
+            radius_km = 40.0
+        my_lat, my_lng = float(me['sosLat']), float(me['sosLng'])
+        alerted = 0
+        scan_kwargs = {
+            'FilterExpression': 'sosOptIn = :t',
+            'ExpressionAttributeValues': {':t': True},
+        }
+        while True:
+            page = profiles.scan(**scan_kwargs)
+            for item in page.get('Items', []):
+                if item['memberId'] == member_id or 'sosLat' not in item:
+                    continue
+                if item['memberId'] in blocked_ids(me) or member_id in blocked_ids(item):
+                    continue
+                try:
+                    dist = haversine_km(my_lat, my_lng, float(item['sosLat']), float(item['sosLng']))
+                except (TypeError, ValueError):
+                    continue
+                if dist <= radius_km:
+                    send_expo_push(
+                        item.get('expoPushToken'),
+                        'A member nearby needs support',
+                        f'{pseudonym_of(me)} reached out for help. Open Northstar and check the circle.')
+                    alerted += 1
+            if 'LastEvaluatedKey' not in page:
+                break
+            scan_kwargs['ExclusiveStartKey'] = page['LastEvaluatedKey']
+        me['lastSosAt'] = now_iso()
+        profiles.put_item(Item=me)
+        return reply(200, {'alerted': alerted})
+
     if path == '/v1/me/avatar' and method == 'POST':
         if not AVATAR_BUCKET:
             return reply(503, {'error': 'avatar_storage_unavailable'})
@@ -316,6 +490,20 @@ def handler(event, context):
         profiles.put_item(Item=profile)
         return reply(200, {'avatarUrl': url})
 
+    if path == '/v1/me/device' and method == 'POST':
+        device_id = str((body or {}).get('deviceId') or '').strip()
+        if not device_id or len(device_id) > 80:
+            return reply(400, {'error': 'invalid_device'})
+        profile = get_profile(member_id)
+        ids = set(profile.get('deviceIds') or [])
+        ids.add(device_id)
+        profile['deviceIds'] = sorted(ids)[:10]
+        # A banned device drags any new account it signs into down with it.
+        if community.get_item(Key={'pk': 'BANNED_DEVICE', 'sk': device_id}).get('Item'):
+            profile['banned'] = True
+        profiles.put_item(Item=profile)
+        return reply(200, {'restricted': bool(profile.get('banned'))})
+
     if path == '/v1/push-tokens' and method == 'POST':
         token = str((body or {}).get('token') or '').strip()
         if not token.startswith('ExponentPushToken') or len(token) > 120:
@@ -324,6 +512,18 @@ def handler(event, context):
         profile['expoPushToken'] = token
         profiles.put_item(Item=profile)
         return reply(204)
+
+    if path == '/v1/follows' and method == 'POST':
+        target = str((body or {}).get('memberId') or '').strip()
+        following = bool((body or {}).get('following', True))
+        if not target or target == member_id or len(target) > 64:
+            return reply(400, {'error': 'invalid_member'})
+        profile = get_profile(member_id)
+        ids = set(profile.get('followingIds') or [])
+        (ids.add if following else ids.discard)(target)
+        profile['followingIds'] = sorted(ids)
+        profiles.put_item(Item=profile)
+        return reply(200, {'followingIds': profile['followingIds']})
 
     if path == '/v1/blocks' and method == 'POST':
         target = str((body or {}).get('memberId') or '').strip()
@@ -381,7 +581,7 @@ def handler(event, context):
     if method == 'PUT':
         try:
             profile = body['profile']
-            allowed = {'pseudonym', 'bio', 'dateOfBirth', 'gender', 'groupPreference', 'sobrietyDate', 'privacyMode'}
+            allowed = {'pseudonym', 'bio', 'dateOfBirth', 'gender', 'groupPreference', 'sobrietyDate', 'privacyMode', 'sponsorAvailable', 'sponsorNote'}
             if not isinstance(profile, dict) or any(key not in allowed for key in profile):
                 raise ValueError()
             if len(profile.get('pseudonym', '')) > 40 or len(profile.get('bio', '')) > 280:
@@ -391,6 +591,10 @@ def handler(event, context):
             if profile.get('groupPreference') not in [None, 'women', 'men', 'all']:
                 raise ValueError()
             if 'privacyMode' in profile and not isinstance(profile['privacyMode'], bool):
+                raise ValueError()
+            if 'sponsorAvailable' in profile and not isinstance(profile['sponsorAvailable'], bool):
+                raise ValueError()
+            if len(profile.get('sponsorNote') or '') > 200:
                 raise ValueError()
         except (ValueError, TypeError, KeyError):
             return reply(400, {'error': 'invalid_profile'})
