@@ -18,7 +18,8 @@
       [
         "expo-notifications",
         {
-          "color": "#5DE0A6"
+          "color": "#5DE0A6",
+          "icon": "./assets/notification-icon.png"
         }
       ],
       "expo-secure-store",
