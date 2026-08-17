@@ -51,6 +51,14 @@
         {
           "contactsPermission": "Northstar uses your contacts only to help you text an invite to friends you choose. Your contacts are never uploaded or shared."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.0"
+          }
+        }
       ]
     ],
     "ios": {

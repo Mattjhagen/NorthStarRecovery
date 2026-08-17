@@ -22,6 +22,7 @@
     "expo-application": "~7.0.8",
     "expo-asset": "~12.0.13",
     "expo-audio": "~1.1.1",
+    "expo-build-properties": "~1.0.10",
     "expo-calendar": "~15.0.8",
     "expo-clipboard": "~8.0.8",
     "expo-contacts": "~15.0.11",
