@@ -77,6 +77,36 @@ export async function scheduleMeetingReminder(title, date, minutesBefore = 10) {
   }
 }
 
+export async function scheduleRecurringMeetingReminder(id, title, rawDay, rawTime, minutesBefore = 10) {
+  try {
+    const granted = await requestNotificationPermissions();
+    if (!granted) return { ok: false };
+    const [h, m] = (rawTime || '12:00:00').split(':').map(Number);
+    let hour = h, minute = m - minutesBefore;
+    if (minute < 0) { minute += 60; hour -= 1; }
+    if (hour < 0) { hour += 24; }
+
+    let trigger = { hour, minute };
+    if (rawDay !== undefined && rawDay !== null) {
+      trigger.type = Notifications.SchedulableTriggerInputTypes.WEEKLY;
+      trigger.weekday = rawDay + 1; // Expo weekday 1=Sunday
+    } else {
+      trigger.type = Notifications.SchedulableTriggerInputTypes.DAILY;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: `meeting-${id}`,
+      content: { title: 'Meeting starting soon', body: `"${title}" begins in ${minutesBefore} minutes.`, sound: true },
+      trigger,
+    });
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+
+export async function cancelSpecificMeetingReminder(id) {
+  await Notifications.cancelScheduledNotificationAsync(`meeting-${id}`).catch(()=>{});
+}
+
 export async function cancelMeetingReminders() {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(

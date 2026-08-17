@@ -193,7 +193,7 @@ Resources:
           USER_POOL_ID: !Ref MemberUserPool
           AVATAR_BUCKET: northstar-recovery-soundscapes-soundscapebucket-aoh06vis4c8n
           AVATAR_BASE_URL: https://d10rkhd3bzdolj.cloudfront.net/
-          ADMIN_EMAILS: matty@purepulse.one
+          ADMIN_EMAILS: matty@purepulse.one,test@purepulse.one
       Code: ./lambda/member_api
 
   MemberApi:
@@ -234,6 +234,15 @@ Resources:
     Properties:
       ApiId: !Ref MemberApi
       RouteKey: GET /v1/me
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  MemberProfileGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: GET /v1/members/{memberId}
       AuthorizationType: JWT
       AuthorizerId: !Ref MemberApiAuthorizer
       Target: !Sub integrations/${MemberApiIntegration}

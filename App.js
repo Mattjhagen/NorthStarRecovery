@@ -1,11 +1,13 @@
-﻿import 'react-native-get-random-values';
+import 'react-native-get-random-values';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Easing, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View, ActivityIndicator } from 'react-native';
+import { Alert, Animated, Easing, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Calendar from 'expo-calendar';
 import * as Haptics from 'expo-haptics';
 import * as QuickActions from 'expo-quick-actions';
 import * as Location from 'expo-location';
@@ -13,7 +15,7 @@ import * as Application from 'expo-application';
 import * as Clipboard from 'expo-clipboard';
 import * as SecureStore from 'expo-secure-store';
 import * as Contacts from 'expo-contacts';
-import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, cancelMeetingReminders, sendLocalNotification, getRemotePushToken, addNotificationTapListener } from './notifications';
+import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, scheduleRecurringMeetingReminder, cancelSpecificMeetingReminder, cancelMeetingReminders, sendLocalNotification, getRemotePushToken, addNotificationTapListener } from './notifications';
 import { READINGS } from './readings';
 import { createAccount, confirmAccount, signInWithPassword, restoreSignedInUser, signOutEverywhere } from './auth';
 import { apiRequest, isBackendConfigured } from './backend';
@@ -144,6 +146,8 @@ async function fetchCMAMeetings() {
               title: m.name,
               time: to12Hour(m.time),
               day: m.day !== undefined ? DAYS[m.day] : 'Daily',
+              rawTime: m.time,
+              rawDay: m.day,
               format,
               region: m.region || m.city || (online ? 'Online' : ''),
               language: m.language || 'English',
@@ -159,7 +163,7 @@ async function fetchCMAMeetings() {
       }
     }
   } catch {}
-  return FALLBACK_MEETINGS;
+  return FALLBACK_MEETINGS.map(m => ({...m, rawTime: '12:00:00'}));
 }
 
 function distanceKm(lat1, lng1, lat2, lng2) {
@@ -360,7 +364,7 @@ function AppInner() {
         ...prev,
         pseudonym: p.pseudonym||'', bio: p.bio||'', dob: p.dateOfBirth||'',
         gender: API_TO_GENDER[p.gender]||'', groupPreference: API_TO_PREF[p.groupPreference]||'All groups',
-        sobrietyDate: p.sobrietyDate||'',
+        sobrietyDate: p.sobrietyDate||'', photo: p.avatarUrl||'', sponsorAvailable: !!p.sponsorAvailable,
       }));
     }).catch(()=>{});
   }, [authState]);
@@ -450,6 +454,8 @@ function AppInner() {
     }},
   ]);
 
+  const totalXP = LEARN_MODULES.slice(0,learnComplete).reduce((s,m)=>s+m.xp,0) + inviteXP;
+
   const saveProfile = async (next) => {
     setProfile(next); setEditingProfile(false); say('Profile saved.');
     if (!isBackendConfigured()) return;
@@ -457,13 +463,24 @@ function AppInner() {
       await apiRequest('/v1/me',{method:'PUT',body:JSON.stringify({profile:{
         pseudonym:next.pseudonym||undefined, bio:next.bio||undefined, dateOfBirth:next.dob||undefined,
         gender:GENDER_TO_API[next.gender]||undefined, groupPreference:PREF_TO_API[next.groupPreference]||undefined,
-        sobrietyDate:next.sobrietyDate||undefined, privacyMode:!!next.privacyMode,
+        sobrietyDate:next.sobrietyDate||undefined, privacyMode:!!next.privacyMode, sponsorAvailable:!!next.sponsorAvailable,
+        xp: totalXP
       }})});
       if (next.photoBase64) {
         await apiRequest('/v1/me/avatar',{method:'POST',body:JSON.stringify({imageBase64:next.photoBase64})}).catch(()=>{});
       }
     } catch { say('Profile saved locally. Sync will retry.'); }
   };
+
+  useEffect(() => {
+    if (authState !== 'authenticated' || !isBackendConfigured() || !profile.pseudonym) return;
+    apiRequest('/v1/me',{method:'PUT',body:JSON.stringify({profile:{
+        pseudonym:profile.pseudonym||undefined, bio:profile.bio||undefined, dateOfBirth:profile.dob||undefined,
+        gender:GENDER_TO_API[profile.gender]||undefined, groupPreference:PREF_TO_API[profile.groupPreference]||undefined,
+        sobrietyDate:profile.sobrietyDate||undefined, privacyMode:!!profile.privacyMode, sponsorAvailable:!!profile.sponsorAvailable,
+        xp: totalXP
+    }})}).catch(()=>{});
+  }, [totalXP]);
 
   const addJournalEntry = async (entry) => {
     setJournalEntries(prev => [entry,...prev]);
@@ -498,7 +515,7 @@ function AppInner() {
         </View>
         {tab==='Connect'  && <Connect say={say} onMessage={openMessagePeer}/>}
         {tab==='Messages' && <Messages say={say} threads={dmThreads} loading={!dmReadMapLoaded} pendingPeer={pendingDmPeer} onClearPending={()=>setPendingDmPeer(null)} readMap={dmReadMap} onMarkRead={markThreadRead} onRefresh={loadDmThreads}/>}
-        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={authEmail.toLowerCase()==='matty@purepulse.one'} sosEnabled={sosEnabled} onToggleSos={toggleSos} onInviteSent={earnInviteXP}/>}
+        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={['matty@purepulse.one','test@purepulse.one'].includes(authEmail.toLowerCase())} sosEnabled={sosEnabled} onToggleSos={toggleSos} onInviteSent={earnInviteXP}/>}
         {tab==='Journal'  && <Journal say={say} entries={journalEntries} onAdd={addJournalEntry}/>}
       </View>
       <View style={styles.tabbar}>
@@ -615,7 +632,8 @@ function ProfileEditor({ profile, onSave, onCancel }) {
           <View style={{flex:1}}><Text style={styles.cardTitle}>Profile photo</Text><Text style={styles.muted}>Optional · tap to choose from your library</Text></View>
           <Icon name="camera-outline" color={C.mint}/>
         </Pressable>
-        <Field label="PSEUDONYM (OPTIONAL)" value={draft.pseudonym} onChange={v=>setDraft(p=>({...p,pseudonym:v}))} placeholder="How should we know you?" autoCapitalize="words"/>
+        <Field label="USERNAME" value={draft.pseudonym} onChange={v=>setDraft(p=>({...p,pseudonym:v}))} placeholder="How should we know you?" autoCapitalize="words"/>
+        <Text style={[styles.muted,{marginBottom:4}]}>Your username is visible to other members. Change it anytime.</Text>
         <View style={styles.field}><Text style={styles.fieldLabel}>BIO (OPTIONAL)</Text><TextInput multiline value={draft.bio} onChangeText={v=>setDraft(p=>({...p,bio:v}))} placeholder="A few words, if you want." placeholderTextColor={C.muted} style={[styles.fieldInput,styles.bioInput]}/></View>
         <Field label="DATE OF BIRTH (OPTIONAL)" value={draft.dob} onChange={v=>setDraft(p=>({...p,dob:formatDateInput(v)}))} placeholder="MM/DD/YYYY"/>
         <Text style={styles.fieldLabel}>GENDER (OPTIONAL)</Text>
@@ -700,7 +718,8 @@ function Onboarding({ onComplete }) {
     <SafeAreaView style={styles.onboardSafe}><ScrollView contentContainerStyle={styles.onboardScroll} automaticallyAdjustKeyboardInsets>
       <Text style={styles.onboardKicker}>WELCOME TO NORTHSTAR</Text><Text style={styles.onboardTitle}>Tell us a little about you.</Text>
       <Text style={styles.onboardCopy}>All optional. Only your pseudonym may be visible to other members.</Text>
-      <Field label="PSEUDONYM (OPTIONAL)" value={profile.pseudonym} onChange={v=>setProfile(p=>({...p,pseudonym:v}))} placeholder="How should we know you?" autoCapitalize="words"/>
+      <Field label="USERNAME" value={profile.pseudonym} onChange={v=>setProfile(p=>({...p,pseudonym:v}))} placeholder="How should we know you?" autoCapitalize="words"/>
+      <Text style={[styles.muted,{marginBottom:4}]}>A random username was generated for you. You can change it anytime.</Text>
       <Field label="SOBRIETY DATE (OPTIONAL)" value={profile.sobrietyDate} onChange={v=>setProfile(p=>({...p,sobrietyDate:formatDateInput(v)}))} placeholder="MM/DD/YYYY"/>
       <Text style={styles.fieldLabel}>GROUP PREFERENCE</Text>
       <View style={styles.choiceWrap}>{['Women-only','Men-only','All groups'].map(x=><Choice key={x} label={x} active={profile.groupPreference===x} onPress={()=>setProfile(p=>({...p,groupPreference:x}))}/>)}</View>
@@ -846,6 +865,67 @@ function Meetings({ say, profile, meetings, loading }) {
   const [query, setQuery] = useState('');
   const [roomUrl, setRoomUrl] = useState(null);
   const [coords, setCoords] = useState(null);
+  const [favorites, setFavorites] = useState(new Set());
+
+  useEffect(() => {
+    AsyncStorage.getItem('northstar_meeting_favs').then(v => {
+      if (v) setFavorites(new Set(JSON.parse(v)));
+    }).catch(()=>{});
+  }, []);
+
+  const toggleFav = async (m) => {
+    const next = new Set(favorites);
+    if (next.has(m.id)) {
+       next.delete(m.id);
+       say('Removed from favorites.');
+       cancelSpecificMeetingReminder(m.id);
+    } else {
+       next.add(m.id);
+       say('Added to favorites.');
+       scheduleRecurringMeetingReminder(m.id, m.title, m.rawDay, m.rawTime, 10);
+    }
+    setFavorites(next);
+    AsyncStorage.setItem('northstar_meeting_favs', JSON.stringify([...next]));
+  };
+
+  const getNextOccurrence = (dayIdx, timeStr) => {
+    const [h, min] = (timeStr || '12:00:00').split(':').map(Number);
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min, 0);
+    if (dayIdx !== undefined && dayIdx !== null) {
+      let diff = dayIdx - now.getDay();
+      if (diff < 0 || (diff === 0 && next < now)) diff += 7;
+      next.setDate(now.getDate() + diff);
+    } else if (next < now) {
+      next.setDate(now.getDate() + 1);
+    }
+    return next;
+  };
+
+  const addToCalendar = async (m) => {
+    const { status } = await Calendar.requestCalendarPermissionsAsync();
+    if (status !== 'granted') { say('Calendar access denied in settings.'); return; }
+    try {
+      const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+      const defaultCalendar = calendars.find(c => c.isPrimary) || calendars.find(c => c.allowsModifications) || calendars[0];
+      if (!defaultCalendar) { say('No calendar found.'); return; }
+
+      const date = getNextOccurrence(m.rawDay, m.rawTime);
+      const endDate = new Date(date.getTime() + 60*60*1000);
+      const freq = (m.rawDay !== undefined && m.rawDay !== null) ? Calendar.Frequency.WEEKLY : Calendar.Frequency.DAILY;
+
+      await Calendar.createEventAsync(defaultCalendar.id, {
+        title: m.title,
+        startDate: date,
+        endDate: endDate,
+        location: m.url || '',
+        notes: m.notes || '',
+        recurrenceRule: { frequency: freq }
+      });
+      say('Added to your calendar.');
+    } catch { say('Could not add to calendar.'); }
+  };
+
   const nearMe = async () => {
     if (coords) { setCoords(null); return; }
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -914,20 +994,36 @@ function Meetings({ say, profile, meetings, loading }) {
       <Text style={styles.results}>{shown.length} meeting{shown.length!==1?'s':''} found</Text>
       {shown.map(m=>(
         <Card key={m.id} style={styles.meeting}>
-          <View style={styles.time}><Text style={styles.timeText}>{m.time}</Text><Text style={styles.timeZone}>{m.day||'daily'}</Text></View>
+          <View style={styles.time}>
+            <Text style={styles.timeText}>{m.time}</Text>
+            <Text style={styles.timeZone}>{m.day||'daily'}</Text>
+          </View>
           <View style={{flex:1}}>
-            <Text style={styles.cardTitle}>{m.title}</Text>
+            <View style={styles.rowBetween}>
+              <Text style={[styles.cardTitle, {flex: 1, paddingRight: 10}]}>{m.title}</Text>
+              <Pressable onPress={() => toggleFav(m)} style={{padding:4, marginTop:-4, marginRight:-4}}>
+                <Icon name={favorites.has(m.id) ? 'star' : 'star-outline'} size={24} color={C.gold}/>
+              </Pressable>
+            </View>
             <Text style={styles.meetingMeta}>{m.format} · {m.region}{m.distanceMi!=null?` · ${m.distanceMi<10?m.distanceMi.toFixed(1):Math.round(m.distanceMi)} mi`:''}</Text>
             <Text style={styles.muted}>{m.language}</Text>
             {m.notes?<Text style={[styles.muted,{fontSize:12}]}>{m.notes}</Text>:null}
-            <Pressable onPress={()=>{
-              if (!m.url) return say('No link available');
-              if (m.passcode) { Clipboard.setStringAsync(m.passcode).catch(()=>{}); say(`Passcode ${m.passcode} copied — paste it if Zoom asks.`); }
-              openWeb(m.url);
-            }} style={styles.inlineAction}>
-              <Text style={styles.inlineText}>{m.action}{m.passcode?` · PW ${m.passcode}`:''}</Text>
-              <Icon name={m.format==='Remote'?'videocam-outline':'navigate-outline'} size={16} color={C.mint}/>
-            </Pressable>
+            
+            <View style={{flexDirection: 'row', gap: 14, flexWrap: 'wrap', marginTop: 8}}>
+              <Pressable onPress={()=>{
+                if (!m.url) return say('No link available');
+                if (m.passcode) { Clipboard.setStringAsync(m.passcode).catch(()=>{}); say(`Passcode ${m.passcode} copied — paste it if Zoom asks.`); }
+                openWeb(m.url);
+              }} style={[styles.inlineAction, {marginTop: 0}]}>
+                <Text style={styles.inlineText}>{m.action}{m.passcode?` · PW ${m.passcode}`:''}</Text>
+                <Icon name={m.format==='Remote'?'videocam-outline':'navigate-outline'} size={16} color={C.mint}/>
+              </Pressable>
+              
+              <Pressable onPress={() => addToCalendar(m)} style={[styles.inlineAction, {marginTop: 0, paddingHorizontal: 12}]}>
+                <Text style={styles.inlineText}>Add to Calendar</Text>
+                <Icon name="calendar-outline" size={16} color={C.mint}/>
+              </Pressable>
+            </View>
           </View>
         </Card>
       ))}
@@ -983,7 +1079,7 @@ function Learn({ say, onReadings, news, complete, onComplete, inviteXP=0 }) {
               {m.steps.map(s=><Text key={s} style={styles.step}>• {s}</Text>)}
               {locked
                 ? <Text style={[styles.muted,{fontStyle:'italic'}]}>Finish the earlier modules to complete this one — reading ahead is always okay.</Text>
-                : <Button label={done?'Review module':'Complete module'} onPress={()=>{if(!done)onComplete(m.id);say(done?'Module opened for review':`${m.title} complete — ${m.xp} XP earned`);}} icon={done?'refresh':'checkmark'}/>}
+                : <Button label={done?'Review module':'Complete module'} onPress={()=>{if(done)openWeb(`https://cmameet.site/modules/${m.id}`);else{onComplete(m.id);say(`${m.title} complete — ${m.xp} XP earned`);}}} icon={done?'refresh':'checkmark'}/>}
             </View>}
           </Card>
         );
@@ -1235,6 +1331,158 @@ function timeAgo(iso) {
   return `${Math.floor(mins/1440)}d ago`;
 }
 
+const REPORT_REASONS = [
+  'Harassment or bullying',
+  'Harmful or dangerous content',
+  'Spam or unwanted messages',
+  'Inappropriate content',
+  'Other',
+];
+
+function ProfileSheet({ visible, initialMember, onClose, onMessage, toggleFollow, blockMember }) {
+  const [full, setFull] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const online = isBackendConfigured();
+  
+  useEffect(() => {
+    if (visible && initialMember?.authorId && online) {
+      setLoading(true);
+      apiRequest(`/v1/members/${initialMember.authorId}`)
+        .then(data => setFull(data.member))
+        .catch(()=>{})
+        .finally(()=>setLoading(false));
+    } else {
+      setFull(null);
+    }
+  }, [visible, initialMember?.authorId, online]);
+
+  const close = () => { setFull(null); onClose(); };
+  const member = full || initialMember;
+  if (!member) return null;
+
+  const daysSober = member.sobrietyDate ? Math.max(0, Math.floor((Date.now() - new Date(member.sobrietyDate).getTime()) / 86400000)) : null;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1}}>
+        <Pressable style={styles.modalBack} onPress={close}>
+          <Pressable style={[styles.sheet, {maxHeight:'85%'}]} onPress={()=>{}}>
+            <View style={styles.handle}/>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{gap:16, paddingBottom: 20}}>
+              <View style={styles.memberHero}>
+                {member.avatarUrl||member.avatar?<Image source={{uri:member.avatarUrl||member.avatar}} style={styles.memberAvatarImg}/>:<View style={styles.memberAvatar}><Text style={styles.bigAvatarText}>{member.initial || (member.pseudonym||member.author||'?').charAt(0).toUpperCase()}</Text></View>}
+                <View style={{flex:1}}>
+                  <Text style={styles.sheetTitle}>{member.pseudonym || member.author}</Text>
+                  <Text style={styles.muted}>Member profile</Text>
+                </View>
+              </View>
+              
+              <Text style={styles.sheetCopy}>{member.bio||'No bio.'}</Text>
+              
+              {(member.xp > 0 || daysSober !== null) && (
+                <View style={{flexDirection:'row', gap:8, flexWrap:'wrap', marginTop: 4}}>
+                  {member.xp > 0 && <View style={[styles.standard, {flex: 1}]}><Icon name="sparkles-outline" color={C.gold}/><Text style={styles.standardText}>{member.xp} XP</Text></View>}
+                  {daysSober !== null && <View style={[styles.standard, {flex: 1}]}><Icon name="calendar-outline" color={C.mint}/><Text style={styles.standardText}>{daysSober} days sober</Text></View>}
+                </View>
+              )}
+
+              {initialMember?.authorId ? (
+                <>
+                  {toggleFollow && <Button label={initialMember.following?'Following ✓':'Follow'} onPress={()=>toggleFollow(initialMember)} kind={initialMember.following?'dark':undefined} icon={initialMember.following?'checkmark':'person-add-outline'}/>}
+                  {onMessage && <Button label="Message privately" onPress={()=>{const target=initialMember; close(); onMessage(target);}} icon="chatbubble-outline"/>}
+                </>
+              ) : null}
+
+              {loading && <ActivityIndicator color={C.mint} style={{marginTop: 10}} />}
+              
+              {full?.posts?.length > 0 && (
+                <View style={{marginTop: 8}}>
+                  <Text style={[styles.mini, {marginBottom: 8}]}>RECENT POSTS</Text>
+                  {full.posts.map(p => (
+                    <View key={p.id} style={[styles.comment, {marginBottom: 8, backgroundColor: C.raised}]}>
+                      <View style={styles.rowBetween}>
+                        <Text style={[styles.muted, {fontSize:10, fontWeight:'900'}]}>{p.category}</Text>
+                        <Text style={styles.msgTime}>{timeAgo(p.createdAt)}</Text>
+                      </View>
+                      <Text style={[styles.muted, {marginTop: 4}]}>{p.body}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              
+              {initialMember?.authorId && blockMember ? (
+                <Pressable style={[styles.dangerAction, {marginTop: 8}]} onPress={()=>{close(); blockMember(initialMember);}}><Icon name="eye-off-outline" color={C.gold}/><Text style={styles.dangerText}>Block member</Text></Pressable>
+              ) : null}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function ReportSheet({ visible, target, onClose, say }) {
+  const [reason, setReason] = useState('');
+  const [details, setDetails] = useState('');
+  const [shareContent, setShareContent] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const online = isBackendConfigured();
+
+  const reset = () => { setReason(''); setDetails(''); setShareContent(true); };
+  const close = () => { reset(); onClose(); };
+  const submit = async () => {
+    if (!reason) { say('Please select a reason.'); return; }
+    if (!online || !target) { say('Reporting needs a connection.'); close(); return; }
+    setBusy(true);
+    const payload = {
+      targetType: target.targetType,
+      targetId: target.targetId,
+      reason,
+    };
+    if (details.trim()) payload.details = details.trim();
+    if (shareContent && target.content) payload.contentSnippet = target.content.slice(0, 500);
+    try {
+      await apiRequest('/v1/moderation/reports', { method: 'POST', body: JSON.stringify(payload) });
+      say('Report received. Thank you for keeping the circle safe.');
+    } catch { say('Report could not be sent. Try again.'); }
+    setBusy(false);
+    close();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1}}>
+        <Pressable style={styles.modalBack} onPress={close}>
+          <Pressable style={[styles.sheet,{gap:16}]} onPress={()=>{}}>
+            <View style={styles.handle}/>
+            <Text style={styles.sheetTitle}>Report</Text>
+            <Text style={styles.sheetCopy}>Help us keep the circle safe. Select the reason that best describes the issue.</Text>
+            <Text style={styles.fieldLabel}>REASON</Text>
+            {REPORT_REASONS.map(r=>(
+              <Pressable key={r} onPress={()=>setReason(r)} style={[styles.reportReason, reason===r&&styles.reportReasonActive]}>
+                <Icon name={reason===r?'radio-button-on':'radio-button-off'} size={18} color={reason===r?C.mint:C.muted}/>
+                <Text style={[styles.reportReasonText, reason===r&&{color:C.warm}]}>{r}</Text>
+              </Pressable>
+            ))}
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>DETAILS (OPTIONAL)</Text>
+              <TextInput multiline value={details} onChangeText={setDetails} placeholder="Tell us more about what happened..." placeholderTextColor={C.muted} style={[styles.fieldInput,styles.bioInput,{minHeight:60}]}/>
+            </View>
+            {target?.content ? (
+              <View style={[styles.setting,{borderBottomWidth:0}]}>
+                <View style={{flex:1}}><Text style={styles.cardTitle}>Share content with moderator</Text><Text style={styles.muted}>Let the moderator see the reported content to make a decision.</Text></View>
+                <Switch value={shareContent} onValueChange={setShareContent} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={shareContent?C.mint:C.muted}/>
+              </View>
+            ) : null}
+            <Button label={busy?'Submitting...':'Submit report'} onPress={busy?undefined:submit} icon="shield-checkmark" />
+            <Pressable onPress={close} style={styles.skip}><Text style={styles.textButtonLabel}>Cancel</Text></Pressable>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 function Connect({ say, onMessage }) {
   const [posts, setPosts] = useState([]);
   const [blocked, setBlocked] = useState([]);
@@ -1274,10 +1522,8 @@ function Connect({ say, onMessage }) {
     setBlocked(b=>[...b,target.author]);setMember(null);setPostSheet(null);say(`${target.author} is now hidden.`);
     if (online && target.authorId) apiRequest('/v1/blocks',{method:'POST',body:JSON.stringify({memberId:target.authorId})}).catch(()=>{});
   }}]);
-  const reportPost = post=>Alert.alert('Report this post?','Our moderators will review it. Thank you for keeping the circle safe.',[{text:'Cancel',style:'cancel'},{text:'Report',style:'destructive',onPress:()=>{
-    say('Report received. Thank you.');
-    if (online && !String(post.id).startsWith('local-')) apiRequest('/v1/moderation/reports',{method:'POST',body:JSON.stringify({targetType:'post',targetId:String(post.id),reason:'member_report'})}).catch(()=>{});
-  }}]);
+  const [reportTarget, setReportTarget] = useState(null);
+  const openReport = (targetType, targetId, content) => setReportTarget({ targetType, targetId, content });
   const publish=()=>{
     if(!draft.trim()) return say('Write a little before sharing.');
     const text=draft.trim(); setDraft(''); setCompose(false);
@@ -1380,31 +1626,20 @@ function Connect({ say, onMessage }) {
                 <Text style={styles.sectionTitle}>COMMENTS</Text>
                 {postSheet.comments.filter(c=>!blocked.includes(c.author)).map(c=>{
                   const cp=posts.find(p=>p.author===c.author)||{author:c.author,initial:c.author.charAt(0).toUpperCase(),bio:''};
-                  return <View key={c.id} style={styles.comment}><Pressable onPress={()=>setMember(cp)} hitSlop={6}><Text style={styles.commentName}>{c.author}</Text></Pressable><Text style={styles.muted}>{c.body}</Text></View>;
+                  return <View key={c.id} style={styles.comment}><Pressable onPress={()=>setMember(cp)} onLongPress={()=>{if(!String(c.id).startsWith('local-')&&postSheet)openReport('comment',`${postSheet.id}:${c.id}`,c.body);}} hitSlop={6}><Text style={styles.commentName}>{c.author}</Text></Pressable><Text style={styles.muted}>{c.body}</Text></View>;
                 })}
               </ScrollView>
               <View style={styles.threadComposer}>
                 <TextInput value={comment} onChangeText={setComment} placeholder="Offer a kind response…" placeholderTextColor={C.muted} style={styles.commentInput}/>
                 <Button label="Add comment" onPress={addComment} icon="chatbubble-outline"/>
-                <Pressable style={styles.dangerAction} onPress={()=>reportPost(postSheet)}><Icon name="flag-outline" color={C.gold}/><Text style={styles.dangerText}>Report post</Text></Pressable>
+                <Pressable style={styles.dangerAction} onPress={()=>{if(!String(postSheet.id).startsWith('local-'))openReport('post',String(postSheet.id),postSheet.body);}}><Icon name="flag-outline" color={C.gold}/><Text style={styles.dangerText}>Report post</Text></Pressable>
               </View>
             </>}
           </Pressable>
         </Pressable></KeyboardAvoidingView>
       </Modal>
-      <Modal visible={!!member} transparent animationType="slide">
-        <Pressable style={styles.modalBack} onPress={()=>setMember(null)}>
-          <Pressable style={styles.sheet} onPress={()=>{}}>
-            {member&&<><View style={styles.handle}/>
-              <View style={styles.memberHero}>{member.avatar?<Image source={{uri:member.avatar}} style={styles.memberAvatarImg}/>:<View style={styles.memberAvatar}><Text style={styles.bigAvatarText}>{member.initial}</Text></View>}<View style={{flex:1}}><Text style={styles.sheetTitle}>{member.author}</Text><Text style={styles.muted}>Member profile</Text></View></View>
-              <Text style={styles.sheetCopy}>{member.bio||'No bio.'}</Text>
-              {member.authorId?<Button label={member.following?'Following ✓':'Follow'} onPress={()=>toggleFollow(member)} kind={member.following?'dark':undefined} icon={member.following?'checkmark':'person-add-outline'}/>:null}
-              <Button label="Message privately" onPress={()=>{const target=member;setMember(null);onMessage(target);}} icon="chatbubble-outline"/>
-              <Pressable style={styles.dangerAction} onPress={()=>blockMember(member)}><Icon name="eye-off-outline" color={C.gold}/><Text style={styles.dangerText}>Block member</Text></Pressable>
-            </>}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ProfileSheet visible={!!member} initialMember={member} onClose={()=>setMember(null)} onMessage={onMessage} toggleFollow={toggleFollow} blockMember={blockMember}/>
+      <ReportSheet visible={!!reportTarget} target={reportTarget} onClose={()=>setReportTarget(null)} say={say}/>
     </ScrollView>
   );
 }
@@ -1415,6 +1650,9 @@ function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap,
   const [msgs, setMsgs] = useState([]);
   const [draft, setDraft] = useState('');
   const online = isBackendConfigured();
+  const listRef = useRef(null);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [member, setMember] = useState(null);
 
   useEffect(() => {
     if (!pendingPeer) return;
@@ -1435,6 +1673,13 @@ function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap,
     return () => { live = false; clearInterval(timer); };
   }, [activeThread]);
 
+  // Auto-scroll to the end whenever messages change
+  useEffect(() => {
+    if (msgs.length > 0 && listRef.current) {
+      setTimeout(() => { listRef.current?.scrollToEnd?.({ animated: true }); }, 100);
+    }
+  }, [msgs.length]);
+
   const openThread = t => { setActiveThread(t); setMsgs([]); onMarkRead(t.threadId); };
   const send = () => {
     if (!draft.trim() || !activeThread) return;
@@ -1444,6 +1689,16 @@ function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap,
       .catch(()=>say('Message not sent. Try again.'));
   };
 
+  const renderMessage = useCallback(({ item: m }) => (
+    <View style={[styles.comment, m.mine ? {backgroundColor:'#1d4038',alignSelf:'flex-end',maxWidth:'85%'} : {alignSelf:'flex-start',maxWidth:'85%'}]}>
+      <View style={styles.msgBubbleHeader}>
+        <Text style={styles.commentName}>{m.mine ? 'You' : activeThread?.peer}</Text>
+        {m.createdAt && <Text style={styles.msgTime}>{timeAgo(m.createdAt)}</Text>}
+      </View>
+      <Text style={styles.muted}>{m.body}</Text>
+    </View>
+  ), [activeThread]);
+
   if (!online) return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <Text style={styles.eyebrow}>PRIVATE</Text><Text style={styles.h1}>Messages</Text>
@@ -1451,26 +1706,36 @@ function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap,
     </ScrollView>
   );
 
-  if (activeThread) return (
-    <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1}}>
+  if (activeThread) return (<>
+    <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} keyboardVerticalOffset={Platform.OS==='ios'?90:0} style={{flex:1}}>
       <View style={[styles.scroll,{flex:1,paddingBottom:12}]}>
         <Pressable onPress={()=>{setActiveThread(null);onRefresh();}} style={styles.inlineAction}><Icon name="chevron-back" color={C.mint}/><Text style={styles.inlineText}>All messages</Text></Pressable>
-        <Text style={styles.h1}>{activeThread.peer}</Text>
-        <ScrollView style={[styles.threadScroll,{flex:1}]} contentContainerStyle={styles.threadContent} showsVerticalScrollIndicator={false}>
-          {msgs.length===0&&<Text style={styles.sheetCopy}>Say hello — messages are private between the two of you. Be kind; you can block or report anytime.</Text>}
-          {msgs.map(m=>(
-            <View key={m.id} style={[styles.comment,m.mine&&{backgroundColor:'#1d4038',alignSelf:'flex-end',maxWidth:'85%'},!m.mine&&{alignSelf:'flex-start',maxWidth:'85%'}]}>
-              <Text style={styles.commentName}>{m.mine?'You':activeThread.peer}</Text><Text style={styles.muted}>{m.body}</Text>
-            </View>
-          ))}
-        </ScrollView>
+        <Pressable onPress={()=>setMember({author:activeThread.peer, authorId:activeThread.peerId})}>
+          <Text style={[styles.h1, {marginBottom: 4}]}>{activeThread.peer}</Text>
+          <Text style={[styles.tapHint, {marginBottom: 16}]}>Tap to view profile</Text>
+        </Pressable>
+        <FlatList
+          ref={listRef}
+          data={msgs}
+          keyExtractor={m=>m.id}
+          renderItem={renderMessage}
+          contentContainerStyle={[styles.threadContent, msgs.length===0&&{flex:1,justifyContent:'center'}]}
+          style={{flex:1}}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={()=>{ listRef.current?.scrollToEnd?.({ animated: false }); }}
+          onLayout={()=>{ listRef.current?.scrollToEnd?.({ animated: false }); }}
+          ListEmptyComponent={<Text style={[styles.sheetCopy,{textAlign:'center'}]}>Say hello - messages are private between the two of you. Be kind; you can block or report anytime.</Text>}
+        />
         <View style={styles.threadComposer}>
-          <TextInput value={draft} onChangeText={setDraft} placeholder="Write something kind…" placeholderTextColor={C.muted} style={styles.commentInput}/>
+          <TextInput value={draft} onChangeText={setDraft} onFocus={()=>{ setTimeout(()=>{ listRef.current?.scrollToEnd?.({ animated: true }); }, 300); }} placeholder="Write something kind…" placeholderTextColor={C.muted} style={styles.commentInput} returnKeyType="send" onSubmitEditing={send} blurOnSubmit={false}/>
           <Button label="Send" onPress={send} icon="paper-plane"/>
+          <Pressable style={styles.dangerAction} onPress={()=>setReportTarget({targetType:'message',targetId:activeThread.threadId,content:msgs.filter(m=>!m.mine).map(m=>m.body).slice(-5).join(' | ')})}><Icon name="flag-outline" color={C.gold}/><Text style={styles.dangerText}>Report conversation</Text></Pressable>
         </View>
       </View>
     </KeyboardAvoidingView>
-  );
+    <ProfileSheet visible={!!member} initialMember={member} onClose={()=>setMember(null)} onMessage={()=>{}} />
+    <ReportSheet visible={!!reportTarget} target={reportTarget} onClose={()=>setReportTarget(null)} say={say}/>
+    </>);
 
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
@@ -1565,6 +1830,7 @@ function SupportNorthstar({ say }) {
 // ─── YOU ──────────────────────────────────────────────────────────────────────
 function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries, saveProfile, isAdmin, sosEnabled, onToggleSos, onInviteSent }) {
   const [adminOpen, setAdminOpen] = useState(false);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [contactQuery, setContactQuery] = useState('');
@@ -1585,22 +1851,30 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
     say(val?'You are listed as an available sponsor.':'You are no longer listed as a sponsor.');
   };
   const [prefs, setPrefs] = useState({ meetings:true, insight:false, checkin:false, circleNotifs:true });
+  useEffect(() => {
+    AsyncStorage.getItem('northstar_prefs').then(v => {
+      if (v) setPrefs(prev => ({...prev, ...JSON.parse(v)}));
+    }).catch(()=>{});
+  }, []);
+  const updatePref = (key, val) => {
+    setPrefs(p => { const next = {...p,[key]:val}; AsyncStorage.setItem('northstar_prefs',JSON.stringify(next)).catch(()=>{}); return next; });
+  };
   const name = profile.pseudonym || 'Northstar member';
   const hasSponsor = profile.sponsor?.name;
   const hasTrusted = profile.trustedPerson?.name && profile.trustedPerson?.enabled;
 
   const toggleInsight = async val => {
-    setPrefs(p=>({...p,insight:val}));
-    if (val) { const r=await scheduleDailyUplift(9,0); if(!r.ok){say(r.reason);setPrefs(p=>({...p,insight:false}));}else say('Daily inspiration at 9 AM.'); }
+    updatePref('insight', val);
+    if (val) { const r=await scheduleDailyUplift(9,0); if(!r.ok){say(r.reason);updatePref('insight', false);}else say('Daily inspiration at 9 AM.'); }
     else { await cancelDailyUplift(); say('Daily inspiration off.'); }
   };
   const toggleCheckin = async val => {
-    setPrefs(p=>({...p,checkin:val}));
-    if (val) { const r=await scheduleDailyCheckin(20,0); if(!r.ok){say(r.reason);setPrefs(p=>({...p,checkin:false}));}else say('Check-in reminder at 8 PM.'); }
+    updatePref('checkin', val);
+    if (val) { const r=await scheduleDailyCheckin(20,0); if(!r.ok){say(r.reason);updatePref('checkin', false);}else say('Check-in reminder at 8 PM.'); }
     else { await cancelDailyCheckin(); say('Check-in reminder off.'); }
   };
   const toggleMeetings = async val => {
-    setPrefs(p=>({...p,meetings:val}));
+    updatePref('meetings', val);
     if (!val) { await cancelMeetingReminders(); say('Meeting reminders off.'); }
     else say('Meeting reminders on.');
   };
@@ -1684,14 +1958,13 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
         ['meetings','Meeting reminders','Heads-up before a meeting starts',prefs.meetings,toggleMeetings],
         ['insight','Daily inspiration','A quiet message each morning at 9 AM',prefs.insight,toggleInsight],
         ['checkin','Evening check-in','Reminder to journal at 8 PM',prefs.checkin,toggleCheckin],
-        ['circleNotifs','Circle & DM alerts','Notify me on replies to my posts',prefs.circleNotifs,v=>setPrefs(p=>({...p,circleNotifs:v}))],
+        ['circleNotifs','Circle & DM alerts','Notify me on replies to my posts',prefs.circleNotifs,v=>updatePref('circleNotifs',v)],
       ].map(([key,title,desc,val,toggle])=>(
         <View key={key} style={styles.setting}>
           <View style={{flex:1}}><Text style={styles.cardTitle}>{title}</Text><Text style={styles.muted}>{desc}</Text></View>
           <Switch value={val} onValueChange={toggle} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={val?C.mint:C.muted}/>
         </View>
       ))}
-      {isAdmin&&<Button label="Send a demo notification" onPress={async()=>{ const r=await scheduleDemoInsight(); say(r.ok?'Check in 8 seconds':r.reason); }} kind="dark" icon="notifications-outline"/>}
 
       <Text style={styles.sectionTitle}>PRIVACY</Text>
       <View style={styles.setting}>
@@ -1712,9 +1985,11 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
       </View>
 
       {isAdmin&&<>
-        <Text style={styles.sectionTitle}>MODERATION</Text>
+        <Text style={styles.sectionTitle}>ADMIN</Text>
+        <Button label="Broadcast notification" onPress={()=>setBroadcastOpen(true)} kind="dark" icon="megaphone-outline"/>
         <Button label="Review reports" onPress={()=>setAdminOpen(true)} kind="dark" icon="shield-half-outline"/>
         <AdminReports visible={adminOpen} onClose={()=>setAdminOpen(false)} say={say}/>
+        <AdminBroadcast visible={broadcastOpen} onClose={()=>setBroadcastOpen(false)} say={say}/>
       </>}
 
       <Text style={styles.sectionTitle}>YOUR NETWORK</Text>
@@ -1808,40 +2083,7 @@ function ReadingsLibrary({ onClose }) {
 
 function ReadingPlayer({ reading, onClose }) {
   const player = useAudioPlayer(reading.audio);
-  const status = useAudioPlayerStatus(player);
-  const progress = status.duration > 0 ? status.currentTime / status.duration : 0;
-  const fmt = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
-  // Switching readings releases the old native player before this cleanup
-  // runs; pausing a released player throws NativeSharedObjectNotFoundException.
-  useEffect(()=>{ return ()=>{ try { player.pause(); } catch {} }; },[player]);
-  useEffect(()=>{
-    if (!status.playing) return;
-    try {
-      player.setActiveForLockScreen(true,
-        { title: reading.title, artist: 'CMA Readings · narrated by Jessica', albumTitle: 'Northstar Recovery', artworkUrl: BRAND_ART });
-    } catch {}
-  },[status.playing, reading, player]);
-  const toggle = ()=>{ if(status.playing) player.pause(); else player.play(); };
-  const seek = frac => player.seekTo(frac * status.duration);
-  return (
-    <View style={styles.readingPlayer}>
-      <View style={styles.rowBetween}>
-        <Text style={styles.cardTitle}>{reading.title}</Text>
-        <Pressable onPress={onClose}><Icon name="close" size={18} color={C.muted}/></Pressable>
-      </View>
-      <Text style={styles.muted}>{reading.description}</Text>
-      <View style={styles.progressTrack}>
-        <Pressable onPress={e=>{ const w=e.nativeEvent.locationX/e.nativeEvent.target?.measure?.(0,0,300,0,0,0)||300; seek(e.nativeEvent.locationX/300); }} style={styles.progressBar}>
-          <View style={[styles.progressFill,{flex:progress}]}/>
-          <View style={{flex:1-progress}}/>
-        </Pressable>
-        <View style={styles.rowBetween}>
-          <Text style={styles.timeLabel}>{fmt(status.currentTime||0)}</Text>
-          <Text style={styles.timeLabel}>{fmt(status.duration||0)}</Text>
-        </View>
-      </View>
-      <View style={styles.playerControls}>
-        <Pressable onPress={()=>player.seekTo(Math.max(0,(status.currentTime||0)-15))} style={styles.skipBtn}>
+  const        <Pressable onPress={()=>player.seekTo(Math.max(0,(status.currentTime||0)-15))} style={styles.skipBtn}>
           <Icon name="play-back-outline" size={22} color={C.muted}/>
           <Text style={styles.skipLabel}>15s</Text>
         </Pressable>
@@ -1860,7 +2102,7 @@ function ReadingPlayer({ reading, onClose }) {
         </Pressable>
         <Pressable onPress={()=>{
           const roomUrl=`https://meet.jit.si/northstar-reading-${Math.random().toString(36).slice(2,8)}`;
-          Alert.alert('Play for your room',`A private video room is ready. Share the link, join, then press play here — the reading ("${reading.title}") plays from your device while the room listens.`,[
+          Alert.alert('Play for your room',`A private video room is ready. Share the link, join, then press play here - the reading ("${reading.title}") plays from your device while the room listens.`,[
             {text:'Cancel',style:'cancel'},
             {text:'Share link',onPress:()=>Share.share({message:`Join me for a CMA reading (${reading.title}): ${roomUrl}`})},
             {text:'Share & join',onPress:()=>{Share.share({message:`Join me for a CMA reading (${reading.title}): ${roomUrl}`});openWeb(roomUrl);}},
@@ -1875,6 +2117,54 @@ function ReadingPlayer({ reading, onClose }) {
 }
 
 // ─── ADMIN ────────────────────────────────────────────────────────────────────
+function AdminBroadcast({ visible, onClose, say }) {
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const templates = [
+    "A new meeting is starting soon. Check the schedule!",
+    "Pull to refresh for the latest features and updates.",
+    "A gentle reminder: evening check-in is waiting for you."
+  ];
+
+  const send = async (msg) => {
+    if (!msg.trim()) return;
+    setSending(true);
+    try {
+      const res = await apiRequest('/v1/admin/notify', {method:'POST',body:JSON.stringify({title:'Northstar Update',body:msg.trim()})});
+      say(`Sent to ${res.sent} active devices.`);
+      setText('');
+      onClose();
+    } catch { say('Failed to broadcast.'); }
+    finally { setSending(false); }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide">
+      <SafeAreaView style={[styles.safe,{backgroundColor:'#141f31'}]}>
+        <View style={styles.header}>
+          <Text style={styles.sheetTitle}>Broadcast Notification</Text>
+          <Pressable onPress={onClose}><Icon name="close" color={C.warm}/></Pressable>
+        </View>
+        <ScrollView contentContainerStyle={{padding:16,gap:16}}>
+          <Text style={styles.muted}>This will send a push notification to all users who have notifications enabled.</Text>
+          
+          <Text style={styles.cardTitle}>Custom Message</Text>
+          <TextInput style={styles.journalInput} placeholder="Type your notification here..." placeholderTextColor={C.muted} value={text} onChangeText={setText} multiline/>
+          <Button label={sending?"Sending...":"Send Broadcast"} onPress={()=>send(text)} disabled={!text.trim()||sending} icon="send"/>
+          
+          <Text style={[styles.cardTitle,{marginTop:20}]}>Templates</Text>
+          {templates.map((t,i) => (
+            <Pressable key={i} style={[styles.actionChip,{alignItems:'flex-start',paddingVertical:14}]} onPress={()=>send(t)} disabled={sending}>
+              <Icon name="megaphone-outline" color={C.mint} size={20}/>
+              <Text style={{color:C.warm,fontSize:15,flex:1,lineHeight:22}}>{t}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
 function AdminReports({ visible, onClose, say }) {
   const [reports, setReports] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -1886,6 +2176,10 @@ function AdminReports({ visible, onClose, say }) {
     catch { say('Action failed.'); }
     setBusy(false);
   };
+  const dismiss = id => {
+    setReports(prev => prev.filter(r => r.id !== id));
+    say('Report dismissed.');
+  };
   return (
     <Modal visible={visible} animationType="slide">
       <SafeAreaView style={[styles.safe,{backgroundColor:'#141f31'}]}>
@@ -1895,6 +2189,28 @@ function AdminReports({ visible, onClose, say }) {
         </View>
         <ScrollView contentContainerStyle={{padding:16,gap:10}}>
           {reports.length===0&&<Text style={styles.muted}>No reports. The circle is quiet.</Text>}
+          {reports.map(r=>(
+            <Card key={r.id}>
+              <View style={styles.rowBetween}><Text style={styles.topic}>{r.targetType.toUpperCase()}</Text><Text style={styles.postTime}>{timeAgo(r.createdAt)}</Text></View>
+              {r.author?<Text style={styles.cardTitle}>{r.author}</Text>:null}
+              {(r.snippet||r.contentSnippet)?<View style={styles.reportSnippet}><Text style={styles.reportSnippetText}>"{r.snippet||r.contentSnippet}"</Text></View>:null}
+              <Text style={styles.muted}>Reason: {r.reason||'member report'}</Text>
+              {r.details?<Text style={styles.muted}>Details: {r.details}</Text>:null}
+              <Text style={[styles.muted,{fontSize:11}]}>Reported by: {r.reporterName||'Unknown'}</Text>
+              <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+                {r.targetType==='post'&&<Pressable disabled={busy} onPress={()=>act('Post removed.','/v1/admin/remove-post',{postId:r.targetId})} style={styles.dangerAction}><Icon name="trash-outline" color={C.gold} size={15}/><Text style={styles.dangerText}>Remove post</Text></Pressable>}
+                {r.authorId&&<Pressable disabled={busy} onPress={()=>act('Member suspended.','/v1/admin/ban',{memberId:r.authorId,banned:true})} style={styles.dangerAction}><Icon name="person-remove-outline" color={C.gold} size={15}/><Text style={styles.dangerText}>Suspend</Text></Pressable>}
+                {r.authorId&&<Pressable disabled={busy} onPress={()=>act('Member and device suspended.','/v1/admin/ban',{memberId:r.authorId,banned:true,banDevices:true})} style={styles.dangerAction}><Icon name="phone-portrait-outline" color={C.gold} size={15}/><Text style={styles.dangerText}>Suspend + device</Text></Pressable>}
+                {r.authorId&&<Pressable disabled={busy} onPress={()=>act('Member restored.','/v1/admin/ban',{memberId:r.authorId,banned:false})} style={[styles.dangerAction,{borderColor:'#3d9074'}]}><Icon name="refresh-outline" color={C.mint} size={15}/><Text style={[styles.dangerText,{color:C.mint}]}>Restore</Text></Pressable>}
+                <Pressable onPress={()=>dismiss(r.id)} style={[styles.dangerAction,{borderColor:C.line}]}><Icon name="close-circle-outline" color={C.muted} size={15}/><Text style={[styles.dangerText,{color:C.muted}]}>Dismiss</Text></Pressable>
+              </View>
+            </Card>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}.length===0&&<Text style={styles.muted}>No reports. The circle is quiet.</Text>}
           {reports.map(r=>(
             <Card key={r.id}>
               <View style={styles.rowBetween}><Text style={styles.topic}>{r.targetType.toUpperCase()}</Text><Text style={styles.postTime}>{timeAgo(r.createdAt)}</Text></View>
@@ -1917,7 +2233,7 @@ function AdminReports({ visible, onClose, say }) {
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  standard:{flexDirection:'row',gap:9,padding:13,borderLeftWidth:2,borderColor:C.mint,backgroundColor:'#16343a'}, standardText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, boardPost:{gap:11}, topic:{color:C.mint,fontSize:10,fontWeight:'900',letterSpacing:1.2}, postTime:{color:C.muted,fontSize:11}, tapHint:{color:C.blue,fontSize:11,marginTop:1}, commentAction:{flexDirection:'row',alignItems:'center',gap:7,paddingTop:11,borderTopWidth:1,borderColor:C.line}, commentActionText:{color:C.mint,fontSize:12,fontWeight:'800',flex:1}, boardEmpty:{minHeight:180,justifyContent:'center',alignItems:'center',gap:10,padding:24,borderWidth:1,borderColor:C.line,borderRadius:17}, memberHero:{flexDirection:'row',alignItems:'center',gap:13}, memberAvatar:{height:57,width:57,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, profileSafety:{flexDirection:'row',gap:9,padding:12,backgroundColor:'#17363a',borderRadius:12}, profileSafetyText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, dangerAction:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, dangerText:{color:C.gold,fontWeight:'800',fontSize:14}, postSheet:{height:'88%',paddingBottom:20}, threadScroll:{flexGrow:0,flexShrink:1}, threadContent:{gap:12,paddingBottom:8}, threadComposer:{gap:8,paddingTop:10,borderTopWidth:1,borderColor:C.line}, comment:{padding:11,backgroundColor:C.raised,borderRadius:11,gap:3}, commentName:{color:C.warm,fontWeight:'800',fontSize:13}, commentInput:{color:C.warm,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,minHeight:52,fontSize:14},
+  standard:{flexDirection:'row',gap:9,padding:13,borderLeftWidth:2,borderColor:C.mint,backgroundColor:'#16343a'}, standardText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, boardPost:{gap:11}, topic:{color:C.mint,fontSize:10,fontWeight:'900',letterSpacing:1.2}, postTime:{color:C.muted,fontSize:11}, tapHint:{color:C.blue,fontSize:11,marginTop:1}, commentAction:{flexDirection:'row',alignItems:'center',gap:7,paddingTop:11,borderTopWidth:1,borderColor:C.line}, commentActionText:{color:C.mint,fontSize:12,fontWeight:'800',flex:1}, boardEmpty:{minHeight:180,justifyContent:'center',alignItems:'center',gap:10,padding:24,borderWidth:1,borderColor:C.line,borderRadius:17}, memberHero:{flexDirection:'row',alignItems:'center',gap:13}, memberAvatar:{height:57,width:57,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, profileSafety:{flexDirection:'row',gap:9,padding:12,backgroundColor:'#17363a',borderRadius:12}, profileSafetyText:{color:C.warm,fontSize:12,lineHeight:18,flex:1}, dangerAction:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, dangerText:{color:C.gold,fontWeight:'800',fontSize:14}, postSheet:{height:'88%',paddingBottom:20}, threadScroll:{flexGrow:0,flexShrink:1}, threadContent:{gap:12,paddingBottom:8}, threadComposer:{gap:8,paddingTop:10,borderTopWidth:1,borderColor:C.line}, comment:{padding:11,backgroundColor:C.raised,borderRadius:11,gap:3}, commentName:{color:C.warm,fontWeight:'800',fontSize:13}, commentInput:{color:C.warm,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,minHeight:52,fontSize:14}, msgBubbleHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8}, msgTime:{color:C.muted,fontSize:10,fontWeight:'600'},
   safe:{flex:1,backgroundColor:C.ink}, topo:{position:'absolute',top:0,left:0,right:0,height:210,backgroundColor:'#172944',borderBottomLeftRadius:110,borderBottomRightRadius:40,opacity:.8}, header:{height:76,paddingHorizontal:20,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, brand:{color:C.warm,fontSize:15,fontWeight:'900',letterSpacing:2}, brandSub:{color:C.muted,fontSize:10,marginTop:3}, headerBtns:{flexDirection:'row',gap:9}, iconBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,borderRadius:12}, helpBtn:{height:38,width:38,alignItems:'center',justifyContent:'center',backgroundColor:C.mint,borderRadius:12}, body:{flex:1}, scroll:{padding:20,paddingBottom:28,gap:14}, eyebrow:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, mini:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2}, sectionTitle:{color:C.mint,fontSize:11,fontWeight:'800',letterSpacing:1.2,marginTop:7}, h1:{color:C.warm,fontSize:31,lineHeight:36,fontWeight:'900',letterSpacing:-.6}, intro:{color:C.muted,fontSize:15,lineHeight:22,marginTop:-7,marginBottom:3}, card:{backgroundColor:C.surface,borderWidth:1,borderColor:'rgba(157,173,197,.14)',padding:16,borderRadius:18,gap:12}, streak:{backgroundColor:'#202e42',flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderColor:'#466176'}, streakNum:{color:C.warm,fontSize:37,fontWeight:'900',marginTop:2}, streakUnit:{fontSize:16,color:C.muted}, muted:{color:C.muted,fontSize:13,lineHeight:19}, sun:{height:56,width:56,borderRadius:28,backgroundColor:'#344154',alignItems:'center',justifyContent:'center'}, rowBetween:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:12}, row:{flexDirection:'row',alignItems:'center',gap:18}, cardTitle:{color:C.warm,fontSize:16,fontWeight:'800',lineHeight:21}, remote:{padding:10,backgroundColor:'#183c3a',borderRadius:12}, button:{backgroundColor:C.mint,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:12,borderRadius:12,marginTop:1}, buttonDark:{backgroundColor:C.raised,borderWidth:1,borderColor:C.line}, buttonText:{color:C.ink,fontWeight:'900',fontSize:14}, quote:{color:C.warm,fontSize:18,lineHeight:27,fontWeight:'600',paddingHorizontal:7,paddingVertical:9}, actionRow:{flexDirection:'row',gap:10}, quick:{flex:1,minHeight:95,backgroundColor:C.raised,borderRadius:16,padding:14,justifyContent:'space-between'}, quickText:{color:C.warm,fontSize:14,fontWeight:'800'}, support:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,padding:12,borderWidth:1,borderColor:'#66583d',borderRadius:12}, supportText:{color:C.gold,fontWeight:'800',fontSize:13}, supportCard:{borderColor:'rgba(93,224,166,.36)'}, supportBadge:{height:38,width:38,borderRadius:13,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, supportFinePrint:{color:C.muted,fontSize:12,lineHeight:17}, supportOptions:{flexDirection:'row',gap:8}, supportOption:{flex:1,backgroundColor:C.raised,borderWidth:1,borderColor:C.line,borderRadius:12,paddingVertical:11,alignItems:'center',gap:2}, supportPrice:{color:C.mint,fontSize:16,fontWeight:'900'}, supportOptionLabel:{color:C.muted,fontSize:9,fontWeight:'700',textAlign:'center'}, tabbar:{height:72,backgroundColor:'#141f31',borderTopWidth:1,borderColor:'#293850',flexDirection:'row',paddingHorizontal:2}, tab:{flex:1,alignItems:'center',justifyContent:'center',gap:3}, tabText:{color:C.muted,fontSize:8,fontWeight:'700'}, location:{flexDirection:'row',alignItems:'center',gap:7}, locationText:{color:C.warm,fontSize:13,fontWeight:'700'}, change:{color:C.mint,fontSize:12,fontWeight:'800',marginLeft:'auto'}, search:{flexDirection:'row',alignItems:'center',backgroundColor:C.surface,borderRadius:13,paddingHorizontal:13,borderWidth:1,borderColor:C.line}, input:{color:C.warm,height:46,flex:1,marginLeft:8,fontSize:14}, segmentScroll:{marginHorizontal:-20,paddingHorizontal:20,flexGrow:0}, segment:{paddingVertical:9,paddingHorizontal:14,marginRight:8,borderRadius:11,borderWidth:1,borderColor:C.line}, segmentActive:{backgroundColor:C.mint,borderColor:C.mint}, segmentText:{color:C.muted,fontWeight:'800',fontSize:13}, segmentTextActive:{color:C.ink}, results:{color:C.muted,fontSize:12,fontWeight:'700'}, meeting:{flexDirection:'row',gap:13}, time:{width:54,borderRightWidth:1,borderColor:C.line}, timeText:{color:C.warm,fontWeight:'900',fontSize:14}, timeZone:{color:C.muted,fontSize:10,marginTop:3}, meetingMeta:{color:C.blue,fontSize:12,fontWeight:'700',marginTop:2}, inlineAction:{flexDirection:'row',alignItems:'center',gap:5,marginTop:7}, inlineText:{color:C.mint,fontWeight:'800',fontSize:13}, empty:{alignItems:'center',paddingVertical:30}, xp:{backgroundColor:'#26304b',flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, xpNum:{color:C.gold,fontWeight:'900',fontSize:25,marginTop:3}, xpSmall:{fontSize:13,color:C.muted}, module:{gap:0}, moduleDot:{height:31,width:31,borderRadius:10,alignItems:'center',justifyContent:'center',backgroundColor:C.raised,marginRight:11}, moduleDetail:{borderTopWidth:1,borderColor:C.line,marginTop:14,paddingTop:12,gap:7}, moduleCopy:{color:C.warm,lineHeight:20,fontSize:14,fontWeight:'700'}, step:{color:C.muted,fontSize:13}, calmTab:{flex:1}, hidden:{display:'none'}, playerCard:{alignItems:'center',paddingVertical:20,gap:8}, breathGuide:{height:220,width:220,alignSelf:'center',alignItems:'center',justifyContent:'center',marginVertical:8}, breathGuideOuter:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:2,borderColor:'rgba(93,224,166,.58)'}, breathGuideInner:{position:'absolute',width:190,height:190,borderRadius:95,borderWidth:1,borderColor:'rgba(117,184,255,.7)'}, breathGuideCenter:{alignItems:'center',gap:4}, breathGlow:{position:'absolute',width:200,height:200,borderRadius:100,backgroundColor:'rgba(93,224,166,.16)'}, breathFill:{position:'absolute',width:190,height:190,borderRadius:95,backgroundColor:'rgba(93,224,166,.22)'}, waveRipple:{position:'absolute',width:170,height:170,borderRadius:85,borderWidth:2,borderColor:C.blue}, breathPhase:{color:C.warm,fontSize:20,fontWeight:'900',marginTop:5}, breathCount:{color:C.muted,fontSize:12,textAlign:'center'}, timer:{color:C.warm,fontSize:38,fontWeight:'900',letterSpacing:1}, playButton:{alignSelf:'stretch',backgroundColor:C.mint,paddingVertical:13,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:9}, playText:{color:C.ink,fontSize:15,fontWeight:'900'}, sessionRow:{flexDirection:'row',gap:9}, session:{flex:1,paddingVertical:12,alignItems:'center',borderWidth:1,borderColor:C.line,borderRadius:12,backgroundColor:C.raised}, sessionActive:{backgroundColor:C.mint,borderColor:C.mint}, sessionText:{color:C.muted,fontWeight:'800'}, sessionTextActive:{color:C.ink}, visualRow:{flexDirection:'row',gap:8}, visualChoice:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,paddingVertical:10,borderRadius:11,borderWidth:1,borderColor:C.line,backgroundColor:C.raised}, visualChoiceActive:{backgroundColor:C.mint,borderColor:C.mint}, visualText:{color:C.muted,fontSize:12,fontWeight:'800'}, visualTextActive:{color:C.ink}, soundscapePicker:{flexDirection:'row',alignItems:'center',gap:10,padding:14,backgroundColor:C.raised,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapePickerText:{flex:1,color:C.warm,fontSize:14,fontWeight:'700'}, soundscapeRow:{flexDirection:'row',alignItems:'center',gap:12,padding:14,backgroundColor:C.surface,borderRadius:14,borderWidth:1,borderColor:C.line}, soundscapeRowActive:{backgroundColor:C.mint,borderColor:C.mint}, compose:{backgroundColor:C.mint,padding:14,borderRadius:14,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, composeText:{fontSize:14,color:C.ink,fontWeight:'900'}, postHead:{flexDirection:'row',alignItems:'center',gap:10}, avatar:{height:35,width:35,borderRadius:12,backgroundColor:'#476686',alignItems:'center',justifyContent:'center'}, avatarText:{color:C.warm,fontWeight:'900'}, avatarImg:{height:35,width:35,borderRadius:12,backgroundColor:C.raised}, memberAvatarImg:{height:57,width:57,borderRadius:18,backgroundColor:C.raised}, postText:{color:C.warm,fontSize:15,lineHeight:22}, profile:{flexDirection:'row',alignItems:'center'}, bigAvatar:{width:56,height:56,borderRadius:18,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, bigAvatarText:{color:C.ink,fontSize:22,fontWeight:'900'}, achievement:{flexDirection:'row',alignItems:'center',gap:12,padding:14,borderWidth:1,borderColor:'#66583d',borderRadius:16}, setting:{flexDirection:'row',alignItems:'center',paddingVertical:11,borderBottomWidth:1,borderColor:C.line,gap:12}, modalBack:{flex:1,backgroundColor:'rgba(5,9,16,.7)',justifyContent:'flex-end'}, sheet:{backgroundColor:'#223047',padding:22,paddingBottom:35,borderTopLeftRadius:26,borderTopRightRadius:26,gap:13}, handle:{width:40,height:4,backgroundColor:C.muted,borderRadius:4,alignSelf:'center',opacity:.5}, sheetTitle:{color:C.warm,fontSize:22,fontWeight:'900'}, sheetCopy:{color:C.muted,lineHeight:21,fontSize:14}, composeInput:{color:C.warm,minHeight:105,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,textAlignVertical:'top',fontSize:15}, toast:{position:'absolute',left:20,right:20,bottom:84,backgroundColor:'#263a44',padding:13,borderRadius:13,flexDirection:'row',alignItems:'center',gap:8,borderWidth:1,borderColor:'#478f72'}, toastText:{color:C.warm,fontSize:13,fontWeight:'700',flex:1},
   badgeDot:{position:'absolute',top:6,right:6,width:9,height:9,borderRadius:5,backgroundColor:'#FF4D4D',borderWidth:1.5,borderColor:C.ink}, dmRow:{flexDirection:'row',alignItems:'center',gap:12,padding:13,backgroundColor:C.surface,borderWidth:1,borderColor:C.line,borderRadius:14}, dmDot:{width:9,height:9,borderRadius:5,backgroundColor:C.mint}, dmPreviewRow:{flexDirection:'row',alignItems:'center',gap:10}, dmPreviewAvatar:{height:40,width:40,borderRadius:14,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'}, bellDivider:{height:1,backgroundColor:C.line,marginVertical:2},
   onboardSafe:{flex:1,backgroundColor:C.ink}, onboardStar:{height:180,alignItems:'center',justifyContent:'center',backgroundColor:'#173047',borderBottomRightRadius:95,borderBottomLeftRadius:35}, welcomeBody:{padding:28,gap:15}, welcomeTitle:{color:C.warm,fontSize:38,fontWeight:'900',lineHeight:44,letterSpacing:-1}, welcomeCopy:{color:C.muted,fontSize:16,lineHeight:25,maxWidth:310}, welcomeBottom:{padding:24,gap:20,marginTop:'auto'}, textButton:{alignItems:'center',justifyContent:'center',flexDirection:'row',gap:6,padding:8}, textButtonLabel:{color:C.mint,fontSize:14,fontWeight:'800'}, onboardScroll:{padding:24,paddingTop:32,gap:17,paddingBottom:45}, onboardKicker:{color:C.mint,fontSize:11,fontWeight:'900',letterSpacing:1.5,marginTop:8}, onboardTitle:{color:C.warm,fontSize:32,lineHeight:38,fontWeight:'900',letterSpacing:-.7}, onboardCopy:{color:C.muted,fontSize:15,lineHeight:23,marginBottom:5}, field:{gap:6}, fieldLabel:{color:C.muted,fontSize:10,fontWeight:'900',letterSpacing:1}, fieldInput:{borderBottomWidth:1,borderColor:C.line,color:C.warm,paddingVertical:12,fontSize:16}, bioInput:{minHeight:82,textAlignVertical:'top',borderWidth:1,borderRadius:12,paddingHorizontal:12}, choiceWrap:{flexDirection:'row',flexWrap:'wrap',gap:8}, choice:{paddingVertical:10,paddingHorizontal:12,borderWidth:1,borderColor:C.line,borderRadius:10,flexDirection:'row',gap:6,alignItems:'center'}, choiceActive:{backgroundColor:C.mint,borderColor:C.mint}, choiceText:{color:C.muted,fontSize:13,fontWeight:'800'}, choiceTextActive:{color:C.ink}, statusNote:{color:C.gold,fontSize:13,lineHeight:19,backgroundColor:'#312b20',padding:12,borderRadius:10}, skip:{alignItems:'center',padding:7}, preferenceNote:{flexDirection:'row',gap:8,alignItems:'center',padding:10,backgroundColor:'#163636',borderWidth:1,borderColor:'#326d60',borderRadius:11}, preferenceText:{color:C.warm,fontSize:12,flex:1,lineHeight:17}, privacyAction:{flexDirection:'row',alignItems:'center',gap:12,padding:14,borderWidth:1,borderColor:C.line,borderRadius:15}, photoRow:{flexDirection:'row',alignItems:'center',gap:14,padding:14,backgroundColor:C.raised,borderRadius:14,borderWidth:1,borderColor:C.line}, journalScroll:{backgroundColor:'#151d2b'}, journalNew:{backgroundColor:C.mint,padding:14,borderRadius:13,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8}, journalEmpty:{minHeight:220,justifyContent:'center',alignItems:'center',gap:12,borderTopWidth:1,borderBottomWidth:1,borderColor:'#4d4a40',paddingHorizontal:36}, journalEntry:{backgroundColor:'#20263a',padding:18,gap:11,borderLeftWidth:2,borderColor:C.gold}, journalMood:{color:C.gold,fontSize:12,fontWeight:'800'}, journalBody:{color:C.warm,fontSize:16,lineHeight:25}, journalSheet:{backgroundColor:'#252b3a'}, moodRow:{flexDirection:'row',gap:7,flexWrap:'wrap'}, journalInput:{minHeight:190,color:C.warm,fontSize:17,lineHeight:26,textAlignVertical:'top',paddingVertical:10,borderBottomWidth:1,borderColor:'#665f4f'},

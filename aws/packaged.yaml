@@ -1,0 +1,598 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Production identity and minimal member API for Northstar Recovery 
+  in Ohio.
+Resources:
+  MemberProfiles:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: memberId
+        AttributeType: S
+      KeySchema:
+      - AttributeName: memberId
+        KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      TableName: northstar-recovery-production-profiles
+  JournalEntries:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: memberId
+        AttributeType: S
+      - AttributeName: createdAt
+        AttributeType: S
+      KeySchema:
+      - AttributeName: memberId
+        KeyType: HASH
+      - AttributeName: createdAt
+        KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      TableName: northstar-recovery-production-journal
+  CommunityContent:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: pk
+        AttributeType: S
+      - AttributeName: sk
+        AttributeType: S
+      KeySchema:
+      - AttributeName: pk
+        KeyType: HASH
+      - AttributeName: sk
+        KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      TableName: northstar-recovery-production-community
+  DirectMessages:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: pk
+        AttributeType: S
+      - AttributeName: sk
+        AttributeType: S
+      KeySchema:
+      - AttributeName: pk
+        KeyType: HASH
+      - AttributeName: sk
+        KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      TableName: northstar-recovery-production-dms
+  MemberUserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: northstar-recovery-production
+      UsernameAttributes:
+      - email
+      AutoVerifiedAttributes:
+      - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+      - SOFTWARE_TOKEN_MFA
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 3
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+        - Name: verified_email
+          Priority: 1
+      UserPoolAddOns:
+        AdvancedSecurityMode: AUDIT
+  MemberAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: northstar-recovery-mobile-production
+      UserPoolId:
+        Ref: MemberUserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      ExplicitAuthFlows:
+      - ALLOW_USER_SRP_AUTH
+      - ALLOW_REFRESH_TOKEN_AUTH
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+  ApiLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/apigateway/northstar-recovery-production
+      RetentionInDays: 90
+  MemberApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: member-profile-access
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:DeleteItem
+            - dynamodb:Scan
+            Resource:
+              Fn::GetAtt:
+              - MemberProfiles
+              - Arn
+          - Effect: Allow
+            Action:
+            - dynamodb:PutItem
+            - dynamodb:Query
+            Resource:
+              Fn::GetAtt:
+              - JournalEntries
+              - Arn
+          - Effect: Allow
+            Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:Query
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            Resource:
+              Fn::GetAtt:
+              - CommunityContent
+              - Arn
+          - Effect: Allow
+            Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:Query
+            - dynamodb:UpdateItem
+            Resource:
+              Fn::GetAtt:
+              - DirectMessages
+              - Arn
+          - Effect: Allow
+            Action: s3:PutObject
+            Resource: 
+              arn:aws:s3:::northstar-recovery-soundscapes-soundscapebucket-aoh06vis4c8n/avatars/*
+          - Effect: Allow
+            Action: cognito-idp:AdminDeleteUser
+            Resource:
+              Fn::GetAtt:
+              - MemberUserPool
+              - Arn
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+  MemberApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: northstar-recovery-production-member-api
+      Runtime: python3.12
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+        - MemberApiRole
+        - Arn
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          PROFILES_TABLE:
+            Ref: MemberProfiles
+          JOURNAL_TABLE:
+            Ref: JournalEntries
+          COMMUNITY_TABLE:
+            Ref: CommunityContent
+          DMS_TABLE:
+            Ref: DirectMessages
+          USER_POOL_ID:
+            Ref: MemberUserPool
+          AVATAR_BUCKET: 
+            northstar-recovery-soundscapes-soundscapebucket-aoh06vis4c8n
+          AVATAR_BASE_URL: https://d10rkhd3bzdolj.cloudfront.net/
+          ADMIN_EMAILS: matty@purepulse.one,test@purepulse.one
+      Code:
+        S3Bucket: northstar-recovery-deploy-artifacts
+        S3Key: 1fb033008b561888244e1ae84f245310
+  MemberApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: northstar-recovery-production
+      ProtocolType: HTTP
+      DisableExecuteApiEndpoint: false
+  MemberApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::GetAtt:
+        - MemberApiFunction
+        - Arn
+      PayloadFormatVersion: '2.0'
+  MemberApiAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      AuthorizerType: JWT
+      IdentitySource:
+      - $request.header.Authorization
+      JwtConfiguration:
+        Audience:
+        - Ref: MemberAppClient
+        Issuer:
+          Fn::Sub: 
+            https://cognito-idp.${AWS::Region}.amazonaws.com/${MemberUserPool}
+      Name: northstar-member-jwt
+  HealthRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: GET /v1/health
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  MemberGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: GET /v1/me
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  MemberProfileGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: GET /v1/members/{memberId}
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  MemberPutRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: PUT /v1/me
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  MemberDeleteRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: DELETE /v1/me
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  JournalListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: GET /v1/journal
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  JournalCreateRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/journal
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  PostsListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: GET /v1/posts
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  PostsCreateRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/posts
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  CommentsListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: GET /v1/posts/{postId}/comments
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  CommentsCreateRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/posts/{postId}/comments
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  DmThreadsListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: GET /v1/dms
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  DmThreadsCreateRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/dms
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  DmMessagesListRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: GET /v1/dms/{threadId}/messages
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  DmMessagesCreateRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/dms/{threadId}/messages
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  PushTokenRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/push-tokens
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  BlocksRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/blocks
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  ReportsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/moderation/reports
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  AvatarUploadRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/me/avatar
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  LocationRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/me/location
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  SosRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/sos
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  SponsorsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: GET /v1/sponsors
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  AdminReportsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: GET /v1/admin/reports
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  AdminBanRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/admin/ban
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  AdminRemovePostRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/admin/remove-post
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  DeviceRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/me/device
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  FollowsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      RouteKey: POST /v1/follows
+      AuthorizationType: JWT
+      AuthorizerId:
+        Ref: MemberApiAuthorizer
+      Target:
+        Fn::Sub: integrations/${MemberApiIntegration}
+  DefaultStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId:
+        Ref: MemberApi
+      StageName: $default
+      AutoDeploy: true
+      AccessLogSettings:
+        DestinationArn:
+          Fn::GetAtt:
+          - ApiLogs
+          - Arn
+        Format: '{"requestId":"$context.requestId","status":"$context.status","routeKey":"$context.routeKey","integrationError":"$context.integrationErrorMessage"}'
+  ApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Ref: MemberApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: 
+          arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${MemberApi}/*/*
+Outputs:
+  ApiBaseUrl:
+    Description: Public API base URL. All member routes require a Cognito JWT.
+    Value:
+      Fn::Sub: https://${MemberApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+  CognitoUserPoolId:
+    Value:
+      Ref: MemberUserPool
+  CognitoAppClientId:
+    Value:
+      Ref: MemberAppClient

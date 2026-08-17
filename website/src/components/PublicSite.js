@@ -27,7 +27,7 @@ export default function PublicSite() {
         <h1 id="hero-title">Find your way<br />to a <em>meeting.</em><span className="ns-compass-star" aria-hidden="true">✦</span></h1>
         <p>Northstar helps you find Crystal Meth Anonymous meeting listings and stay close to the recovery resources that matter.</p>
       </div>
-      <div className="ns-actions"><AppLink>Open Northstar</AppLink><a className="ns-button ns-button-quiet" href={CMA_DIRECTORY} target="_blank" rel="noreferrer">Official CMA directory <ExternalLink size={16} aria-hidden="true" /></a></div>
+      <div className="ns-actions"><AppLink>Open Northstar iOS</AppLink><a className="ns-button ns-button-quiet" href="https://play.google.com/store/apps/details?id=com.northstar.cma&pli=1" target="_blank" rel="noreferrer">Get it on Android <ExternalLink size={16} aria-hidden="true" /></a><a className="ns-button ns-button-quiet" href={CMA_DIRECTORY} target="_blank" rel="noreferrer">Official CMA directory <ExternalLink size={16} aria-hidden="true" /></a></div>
       <p className="ns-fine-print">Meeting listings are sourced from the official CMA directory.</p>
       <div className="ns-aurora" aria-hidden="true"><div className="ns-ribbon ns-ribbon-one" /><div className="ns-ribbon ns-ribbon-two" /><div className="ns-ribbon ns-ribbon-three" /><div className="ns-northstar">✦</div></div>
     </section>

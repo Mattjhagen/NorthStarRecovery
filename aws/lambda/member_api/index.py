@@ -9,6 +9,7 @@ import hashlib
 import json
 import math
 import os
+import random
 import urllib.request
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -30,6 +31,29 @@ MOODS = ['heavy', 'tender', 'steady', 'hopeful']
 ADMIN_EMAILS = {e.strip().lower() for e in os.environ.get('ADMIN_EMAILS', '').split(',') if e.strip()}
 POST_CATEGORIES = ['QUESTION', 'STORY', 'CHECK-IN']
 EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
+
+_PSEUDONYM_ADJECTIVES = [
+    'Brave', 'Calm', 'Gentle', 'Hopeful', 'Kind', 'Quiet', 'Steady',
+    'Warm', 'Bright', 'Clear', 'Golden', 'Humble', 'Noble', 'Patient',
+    'Rising', 'Serene', 'Still', 'Strong', 'True', 'Wise', 'Bold',
+    'Free', 'Open', 'Peaceful', 'Radiant', 'Rooted', 'Soft', 'Tender',
+    'Vivid', 'Whole',
+]
+_PSEUDONYM_NOUNS = [
+    'River', 'Meadow', 'Summit', 'Harbor', 'Trail', 'Stone', 'Cedar',
+    'Falcon', 'Anchor', 'Brook', 'Canyon', 'Dusk', 'Echo', 'Fern',
+    'Grove', 'Haven', 'Iris', 'Juniper', 'Lark', 'Maple', 'Oak',
+    'Pine', 'Quail', 'Ridge', 'Sage', 'Tide', 'Vale', 'Willow',
+    'Dawn', 'Ember',
+]
+
+
+def generate_pseudonym():
+    """Generate a Reddit-style random username like GentleRiver42."""
+    adj = random.choice(_PSEUDONYM_ADJECTIVES)
+    noun = random.choice(_PSEUDONYM_NOUNS)
+    num = random.randint(1, 99)
+    return f'{adj}{noun}{num}'
 
 
 def reply(status, body=None):
@@ -332,9 +356,13 @@ def handler(event, context):
                 ScanIndexForward=False, Limit=50).get('Items', [])
             reports = []
             for i in items:
+                reporter_profile = get_profile(i['reporterId'])
                 entry = {
                     'id': i['sk'], 'targetType': i['targetType'], 'targetId': i['targetId'],
                     'reason': i.get('reason', ''), 'createdAt': i['createdAt'], 'reporterId': i['reporterId'],
+                    'reporterName': pseudonym_of(reporter_profile),
+                    'details': i.get('details', ''),
+                    'contentSnippet': i.get('contentSnippet', ''),
                 }
                 if i['targetType'] == 'post':
                     pointer = find_post(i['targetId'])
@@ -344,8 +372,30 @@ def handler(event, context):
                             entry['authorId'] = feed['authorId']
                             entry['author'] = feed.get('pseudonym', '')
                             entry['snippet'] = feed.get('body', '')[:140]
+                elif i['targetType'] == 'comment':
+                    # targetId format: postId:commentId
+                    parts = i['targetId'].split(':', 1)
+                    if len(parts) == 2:
+                        post_id, comment_id = parts
+                        pointer = find_post(post_id)
+                        if pointer:
+                            comment_items = community.query(
+                                KeyConditionExpression=Key('pk').eq(f'COMMENTS#{post_id}'),
+                                Limit=200).get('Items', [])
+                            for ci in comment_items:
+                                if ci.get('commentId') == comment_id:
+                                    entry['authorId'] = ci.get('authorId', '')
+                                    entry['author'] = ci.get('pseudonym', '')
+                                    entry['snippet'] = ci.get('body', '')[:140]
+                                    break
+                elif i['targetType'] == 'message':
+                    # For messages, we rely on the contentSnippet stored at report time
+                    # targetId is the threadId
+                    pass
                 elif i['targetType'] == 'member':
+                    target_profile = get_profile(i['targetId'])
                     entry['authorId'] = i['targetId']
+                    entry['author'] = pseudonym_of(target_profile)
                 reports.append(entry)
             return reply(200, {'reports': reports})
         if path == '/v1/admin/ban' and method == 'POST':
@@ -374,6 +424,21 @@ def handler(event, context):
             community.delete_item(Key={'pk': 'FEED', 'sk': pointer['feedSk']})
             community.delete_item(Key={'pk': f'POSTID#{target}', 'sk': 'POINTER'})
             return reply(200, {'removed': target})
+        if path == '/v1/admin/notify' and method == 'POST':
+            title = str((body or {}).get('title') or '').strip()
+            message = str((body or {}).get('body') or '').strip()
+            if not title or not message:
+                return reply(400, {'error': 'invalid_payload'})
+            # Iterate over all profiles that have an expoPushToken
+            sent_count = 0
+            paginator = profiles.meta.client.get_paginator('scan')
+            for page in paginator.paginate(TableName=profiles.name):
+                for item in page.get('Items', []):
+                    token = item.get('expoPushToken')
+                    if token:
+                        send_expo_push(token, title, message)
+                        sent_count += 1
+            return reply(200, {'sent': sent_count})
         return reply(404, {'error': 'not_found'})
 
     if path == '/v1/sponsors' and method == 'GET':
@@ -541,14 +606,23 @@ def handler(event, context):
         target_type = str((body or {}).get('targetType') or '')
         target_id = str((body or {}).get('targetId') or '')
         reason = str((body or {}).get('reason') or '').strip()
-        if target_type not in ['post', 'comment', 'message', 'member'] or not target_id or len(target_id) > 64 or len(reason) > 500:
+        details = str((body or {}).get('details') or '').strip()[:500]
+        content_snippet = str((body or {}).get('contentSnippet') or '').strip()[:500]
+        if target_type not in ['post', 'comment', 'message', 'member'] or not target_id or len(target_id) > 128 or len(reason) > 500:
             return reply(400, {'error': 'invalid_report'})
+        reporter = get_profile(member_id)
         created = now_iso()
-        community.put_item(Item={
+        item = {
             'pk': 'REPORT', 'sk': f'{created}#{uuid.uuid4().hex}',
-            'reporterId': member_id, 'targetType': target_type,
+            'reporterId': member_id, 'reporterName': pseudonym_of(reporter),
+            'targetType': target_type,
             'targetId': target_id, 'reason': reason, 'createdAt': created,
-        })
+        }
+        if details:
+            item['details'] = details
+        if content_snippet:
+            item['contentSnippet'] = content_snippet
+        community.put_item(Item=item)
         return reply(201, {'status': 'received'})
 
     if path == '/v1/journal':
@@ -571,17 +645,59 @@ def handler(event, context):
             return reply(201, {'entry': entry})
         return reply(405, {'error': 'method_not_allowed'})
 
+    target_member_id = params.get('memberId')
+    if target_member_id and path == f'/v1/members/{target_member_id}':
+        if method == 'GET':
+            item = profiles.get_item(Key={'memberId': target_member_id}).get('Item')
+            if not item:
+                return reply(404, {'error': 'member_not_found'})
+            
+            # Fetch recent posts authored by this member
+            feed_items = community.query(
+                KeyConditionExpression=Key('pk').eq('FEED'),
+                ScanIndexForward=False, Limit=200).get('Items', [])
+            
+            recent_posts = [
+                {
+                    'id': i['postId'], 'category': i['category'],
+                    'body': i['body'], 'createdAt': i['createdAt'],
+                    'commentCount': int(i.get('commentCount', 0))
+                }
+                for i in feed_items if i.get('authorId') == target_member_id
+            ]
+
+            is_private = item.get('privacyMode', False)
+            
+            return reply(200, {'member': {
+                'id': target_member_id,
+                'pseudonym': item.get('pseudonym', ''),
+                'avatarUrl': item.get('avatarUrl', ''),
+                'bio': item.get('bio', ''),
+                'xp': item.get('xp', 0),
+                'sobrietyDate': item.get('sobrietyDate') if not is_private else None,
+                'sponsorAvailable': item.get('sponsorAvailable', False),
+                'sponsorNote': item.get('sponsorNote', ''),
+                'posts': recent_posts
+            }})
+        return reply(405, {'error': 'method_not_allowed'})
+
     if path != '/v1/me':
         return reply(404, {'error': 'not_found'})
 
     if method == 'GET':
         item = profiles.get_item(Key={'memberId': member_id}).get('Item')
-        return reply(200, {'profile': item or {'memberId': member_id, 'preferences': {}}})
+        if item is None:
+            item = {'memberId': member_id, 'preferences': {}}
+        # Auto-assign a pseudonym if the member does not have one yet.
+        if not (item.get('pseudonym') or '').strip():
+            item['pseudonym'] = generate_pseudonym()
+            profiles.put_item(Item=item)
+        return reply(200, {'profile': item})
 
     if method == 'PUT':
         try:
             profile = body['profile']
-            allowed = {'pseudonym', 'bio', 'dateOfBirth', 'gender', 'groupPreference', 'sobrietyDate', 'privacyMode', 'sponsorAvailable', 'sponsorNote'}
+            allowed = {'pseudonym', 'bio', 'dateOfBirth', 'gender', 'groupPreference', 'sobrietyDate', 'privacyMode', 'sponsorAvailable', 'sponsorNote', 'xp'}
             if not isinstance(profile, dict) or any(key not in allowed for key in profile):
                 raise ValueError()
             if len(profile.get('pseudonym', '')) > 40 or len(profile.get('bio', '')) > 280:
@@ -600,6 +716,9 @@ def handler(event, context):
             return reply(400, {'error': 'invalid_profile'})
         existing = profiles.get_item(Key={'memberId': member_id}).get('Item', {'memberId': member_id})
         existing.update(profile)
+        # Never allow an empty pseudonym; re-generate if cleared.
+        if not (existing.get('pseudonym') or '').strip():
+            existing['pseudonym'] = generate_pseudonym()
         profiles.put_item(Item=existing)
         return reply(200, {'profile': existing})
 
