@@ -15,5 +15,21 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+    <div id="tf-banner" style="position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#101827;border-top:1px solid #34445d;padding:14px 20px;display:flex;align-items:center;justify-content:center;gap:14px;font-family:-apple-system,'Helvetica Neue',sans-serif;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+      <span style="color:#9DADC5;font-size:14px;font-weight:500;">Apps now in beta —</span>
+      <a href="https://testflight.apple.com/join/9wZVur1F" id="tf-link" style="display:inline-flex;align-items:center;gap:7px;background:#5DE0A6;color:#101827;font-size:14px;font-weight:800;padding:9px 18px;border-radius:10px;text-decoration:none;">
+        TestFlight (iOS)
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#101827" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+      <a href="https://play.google.com/store/apps/details?id=com.northstar.cma" style="display:inline-flex;align-items:center;gap:7px;background:#101827;border:2px solid #5DE0A6;color:#5DE0A6;font-size:14px;font-weight:800;padding:7px 18px;border-radius:10px;text-decoration:none;">
+        Google Play
+      </a>
+      <button onclick="document.getElementById('tf-banner').style.display='none'" style="background:none;border:none;color:#9DADC5;cursor:pointer;padding:4px;margin-left:4px;font-size:18px;line-height:1;">×</button>
+    </div>
   </body>
 </html>
