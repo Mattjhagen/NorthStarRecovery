@@ -2216,25 +2216,6 @@ function AdminReports({ visible, onClose, say }) {
       </SafeAreaView>
     </Modal>
   );
-}.length===0&&<Text style={styles.muted}>No reports. The circle is quiet.</Text>}
-          {reports.map(r=>(
-            <Card key={r.id}>
-              <View style={styles.rowBetween}><Text style={styles.topic}>{r.targetType.toUpperCase()}</Text><Text style={styles.postTime}>{timeAgo(r.createdAt)}</Text></View>
-              {r.author?<Text style={styles.cardTitle}>{r.author}</Text>:null}
-              {r.snippet?<Text style={styles.muted}>“{r.snippet}”</Text>:null}
-              <Text style={styles.muted}>Reason: {r.reason||'member report'}</Text>
-              <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-                {r.targetType==='post'&&<Pressable disabled={busy} onPress={()=>act('Post removed.','/v1/admin/remove-post',{postId:r.targetId})} style={styles.dangerAction}><Icon name="trash-outline" color={C.gold} size={15}/><Text style={styles.dangerText}>Remove post</Text></Pressable>}
-                {r.authorId&&<Pressable disabled={busy} onPress={()=>act('Member suspended.','/v1/admin/ban',{memberId:r.authorId,banned:true})} style={styles.dangerAction}><Icon name="person-remove-outline" color={C.gold} size={15}/><Text style={styles.dangerText}>Suspend</Text></Pressable>}
-                {r.authorId&&<Pressable disabled={busy} onPress={()=>act('Member and device suspended.','/v1/admin/ban',{memberId:r.authorId,banned:true,banDevices:true})} style={styles.dangerAction}><Icon name="phone-portrait-outline" color={C.gold} size={15}/><Text style={styles.dangerText}>Suspend + device</Text></Pressable>}
-                {r.authorId&&<Pressable disabled={busy} onPress={()=>act('Member restored.','/v1/admin/ban',{memberId:r.authorId,banned:false})} style={[styles.dangerAction,{borderColor:'#3d9074'}]}><Icon name="refresh-outline" color={C.mint} size={15}/><Text style={[styles.dangerText,{color:C.mint}]}>Restore</Text></Pressable>}
-              </View>
-            </Card>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  );
 }
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
