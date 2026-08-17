@@ -29,7 +29,7 @@ const withPodDeploymentTarget = (config) => {
           'post_install do |installer|' + hookInjection
         );
       } else {
-        contents += \`\npost_install do |installer|\${hookInjection}end\n\`;
+        contents += `\npost_install do |installer|${hookInjection}end\n`;
       }
 
       fs.writeFileSync(podfile, contents);
