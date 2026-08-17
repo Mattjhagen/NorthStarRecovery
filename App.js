@@ -2083,7 +2083,13 @@ function ReadingsLibrary({ onClose }) {
 
 function ReadingPlayer({ reading, onClose }) {
   const player = useAudioPlayer(reading.audio);
-  const        <Pressable onPress={()=>player.seekTo(Math.max(0,(status.currentTime||0)-15))} style={styles.skipBtn}>
+  const status = useAudioPlayerStatus(player);
+  const toggle = () => { if (status.playing) player.pause(); else player.play(); };
+
+  return (
+    <View style={styles.readingPlayer}>
+      <View style={{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:24}}>
+        <Pressable onPress={()=>player.seekTo(Math.max(0,(status.currentTime||0)-15))} style={styles.skipBtn}>
           <Icon name="play-back-outline" size={22} color={C.muted}/>
           <Text style={styles.skipLabel}>15s</Text>
         </Pressable>
