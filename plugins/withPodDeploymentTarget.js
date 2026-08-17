@@ -21,6 +21,8 @@ const withPodDeploymentTarget = (config) => {
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
       if target.name == 'fmt'
         config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'FMT_CONSTEVAL=constexpr'
       end
     end
   end
