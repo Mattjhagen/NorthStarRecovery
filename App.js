@@ -1079,7 +1079,17 @@ function Learn({ say, onReadings, news, complete, onComplete, inviteXP=0 }) {
               {m.steps.map(s=><Text key={s} style={styles.step}>• {s}</Text>)}
               {locked
                 ? <Text style={[styles.muted,{fontStyle:'italic'}]}>Finish the earlier modules to complete this one — reading ahead is always okay.</Text>
-                : <Button label={done?'Review module':'Complete module'} onPress={()=>{if(done)openWeb(`https://cmameet.site/modules/${m.id}`);else{onComplete(m.id);say(`${m.title} complete — ${m.xp} XP earned`);}}} icon={done?'refresh':'checkmark'}/>}
+                : <View style={{flexDirection: 'row', gap: 12}}>
+                    <View style={{flex:1}}>
+                      <Button label="Read module" onPress={() => openWeb(`https://cmameet.site/modules/${m.id}`)} icon="book-outline" />
+                    </View>
+                    {!done && (
+                      <View style={{flex:1}}>
+                        <Button label="Mark complete" onPress={() => { onComplete(m.id); say(`${m.title} complete — ${m.xp} XP earned`); }} icon="checkmark" primary={false} />
+                      </View>
+                    )}
+                  </View>
+              }
             </View>}
           </Card>
         );
