@@ -34,8 +34,10 @@ jobs:
         working-directory: website
         run: npm run build
 
-      - name: Copy CNAME into build output
-        run: cp CNAME website/build/CNAME
+      - name: Copy CNAME and 404 into build output
+        run: |
+          cp CNAME website/build/CNAME
+          cp website/build/index.html website/build/404.html
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4

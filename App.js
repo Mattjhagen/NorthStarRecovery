@@ -1716,36 +1716,38 @@ function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap,
     </ScrollView>
   );
 
-  if (activeThread) return (<>
-    <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} keyboardVerticalOffset={Platform.OS==='ios'?90:0} style={{flex:1}}>
-      <View style={[styles.scroll,{flex:1,paddingBottom:12}]}>
-        <Pressable onPress={()=>{setActiveThread(null);onRefresh();}} style={styles.inlineAction}><Icon name="chevron-back" color={C.mint}/><Text style={styles.inlineText}>All messages</Text></Pressable>
-        <Pressable onPress={()=>setMember({author:activeThread.peer, authorId:activeThread.peerId})}>
-          <Text style={[styles.h1, {marginBottom: 4}]}>{activeThread.peer}</Text>
-          <Text style={[styles.tapHint, {marginBottom: 16}]}>Tap to view profile</Text>
-        </Pressable>
+  if (activeThread) return (
+    <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={{flex:1}}>
+      <View style={{flex:1, backgroundColor: C.ink, paddingBottom: 12}}>
+        <View style={{paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10}}>
+          <Pressable onPress={()=>{setActiveThread(null);onRefresh();}} style={styles.inlineAction}><Icon name="chevron-back" color={C.mint}/><Text style={styles.inlineText}>All messages</Text></Pressable>
+          <Pressable onPress={()=>setMember({author:activeThread.peer, authorId:activeThread.peerId})}>
+            <Text style={[styles.h1, {marginBottom: 4}]}>{activeThread.peer}</Text>
+            <Text style={[styles.tapHint, {marginBottom: 16}]}>Tap to view profile</Text>
+          </Pressable>
+        </View>
         <FlatList
           ref={listRef}
           data={msgs}
           keyExtractor={m=>m.id}
           renderItem={renderMessage}
-          contentContainerStyle={[styles.threadContent, msgs.length===0&&{flex:1,justifyContent:'center'}]}
+          contentContainerStyle={[styles.threadContent, {paddingHorizontal: 20, paddingBottom: 20}, msgs.length===0&&{flex:1,justifyContent:'center'}]}
           style={{flex:1}}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={()=>{ listRef.current?.scrollToEnd?.({ animated: false }); }}
           onLayout={()=>{ listRef.current?.scrollToEnd?.({ animated: false }); }}
           ListEmptyComponent={<Text style={[styles.sheetCopy,{textAlign:'center'}]}>Say hello - messages are private between the two of you. Be kind; you can block or report anytime.</Text>}
         />
-        <View style={styles.threadComposer}>
+        <View style={[styles.threadComposer, {paddingHorizontal: 20}]}>
           <TextInput value={draft} onChangeText={setDraft} onFocus={()=>{ setTimeout(()=>{ listRef.current?.scrollToEnd?.({ animated: true }); }, 300); }} placeholder="Write something kind…" placeholderTextColor={C.muted} style={styles.commentInput} returnKeyType="send" onSubmitEditing={send} blurOnSubmit={false}/>
           <Button label="Send" onPress={send} icon="paper-plane"/>
           <Pressable style={styles.dangerAction} onPress={()=>setReportTarget({targetType:'message',targetId:activeThread.threadId,content:msgs.filter(m=>!m.mine).map(m=>m.body).slice(-5).join(' | ')})}><Icon name="flag-outline" color={C.gold}/><Text style={styles.dangerText}>Report conversation</Text></Pressable>
         </View>
       </View>
+      <ProfileSheet visible={!!member} initialMember={member} onClose={()=>setMember(null)} onMessage={()=>{}} />
+      <ReportSheet visible={!!reportTarget} target={reportTarget} onClose={()=>setReportTarget(null)} say={say}/>
     </KeyboardAvoidingView>
-    <ProfileSheet visible={!!member} initialMember={member} onClose={()=>setMember(null)} onMessage={()=>{}} />
-    <ReportSheet visible={!!reportTarget} target={reportTarget} onClose={()=>setReportTarget(null)} say={say}/>
-    </>);
+  );
 
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
