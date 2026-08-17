@@ -19,12 +19,15 @@ const withPodDeploymentTarget = (config) => {
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
-      if target.name == 'fmt'
-        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'FMT_CONSTEVAL=constexpr'
-      end
     end
+  end
+
+  # Fix fmt consteval issue on Xcode 16
+  fmt_core_path = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt', 'core.h')
+  if File.exist?(fmt_core_path)
+    content = File.read(fmt_core_path)
+    content = content.gsub(/define\s+FMT_CONSTEVAL\s+consteval/, 'define FMT_CONSTEVAL constexpr')
+    File.write(fmt_core_path, content)
   end
 `;
 
