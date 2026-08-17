@@ -72,7 +72,7 @@
       }
     },
     "android": {
-      "package": "com.northstar.recovery",
+      "package": "com.northstar.cma",
       "adaptiveIcon": {
         "foregroundImage": "./assets/northstar-app-icon.png",
         "backgroundColor": "#101827"

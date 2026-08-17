@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# iOS (not needed for Android builds)
+ios/
+
+# Build artifacts and store assets
+builds/
+app-store/
+app-store-screenshots/
+
+# Website (not needed for mobile builds)
+website/
+
+# Misc
+.DS_Store
+.claude/
+.git/
+.github/
+*.jks

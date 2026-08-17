@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    width: 1080px; height: 1920px;
+    background: #101827;
+    font-family: 'Roboto', 'Segoe UI', 'Helvetica Neue', sans-serif;
+    overflow: hidden;
+  }
+  .status-bar {
+    height: 44px;
+    background: #101827;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px;
+  }
+  .status-time { color: #F4F1E8; font-size: 18px; font-weight: 600; }
+  .status-icons { display: flex; align-items: center; gap: 10px; }
+
+  .header {
+    background: #192438;
+    padding: 18px 32px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #34445d;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .star { color: #5DE0A6; font-size: 28px; }
+  .logo-text { color: #F4F1E8; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+  .header-actions { display: flex; gap: 12px; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: #233149; display: flex; align-items: center; justify-content: center;
+  }
+
+  .content { padding: 32px; display: flex; flex-direction: column; gap: 20px; }
+
+  .greeting { margin-bottom: 4px; }
+  .greeting-sub { color: #9DADC5; font-size: 18px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; }
+  .greeting-main { color: #F4F1E8; font-size: 36px; font-weight: 800; line-height: 1.15; margin-top: 6px; }
+
+  .card {
+    background: #192438;
+    border-radius: 16px;
+    padding: 26px 28px;
+    border: 1px solid #34445d;
+  }
+
+  .streak-card {
+    background: linear-gradient(135deg, #192438 0%, #1d3a4a 100%);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .streak-label { color: #9DADC5; font-size: 15px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+  .streak-num { color: #F4F1E8; font-size: 52px; font-weight: 800; line-height: 1; }
+  .streak-unit { color: #9DADC5; font-size: 24px; font-weight: 500; }
+  .streak-sub { color: #9DADC5; font-size: 16px; margin-top: 6px; }
+  .sun-badge {
+    width: 64px; height: 64px; background: #2a3a1f;
+    border-radius: 20px; display: flex; align-items: center; justify-content: center;
+  }
+  .sun-badge svg { width: 36px; height: 36px; }
+
+  .meeting-card { display: flex; gap: 22px; align-items: flex-start; }
+  .meeting-info { flex: 1; }
+  .meeting-label { color: #9DADC5; font-size: 14px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+  .meeting-title { color: #F4F1E8; font-size: 28px; font-weight: 800; margin-bottom: 6px; }
+  .meeting-meta { color: #9DADC5; font-size: 16px; margin-bottom: 18px; }
+  .meeting-badge {
+    width: 54px; height: 54px; background: #1a3d4a; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #5DE0A6; border-radius: 12px;
+    padding: 14px 22px;
+    color: #101827; font-size: 16px; font-weight: 800;
+  }
+  .btn svg { width: 18px; height: 18px; }
+
+  .quick-row { display: flex; gap: 14px; }
+  .quick {
+    flex: 1; background: #192438; border-radius: 14px; border: 1px solid #34445d;
+    padding: 20px 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    text-align: center;
+  }
+  .quick svg { width: 28px; height: 28px; }
+  .quick-text { color: #F4F1E8; font-size: 13px; font-weight: 700; line-height: 1.3; }
+
+  .support-bar {
+    background: #1c2f1a; border-radius: 14px; border: 1px solid #2a4228;
+    padding: 16px 24px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .support-text { color: #F4F1E8; font-size: 15px; font-weight: 600; }
+
+  .tab-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: #192438; border-top: 1px solid #34445d;
+    display: flex; height: 64px;
+  }
+  .tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  }
+  .tab svg { width: 24px; height: 24px; }
+  .tab-text { font-size: 11px; font-weight: 600; }
+  .tab.active .tab-text { color: #5DE0A6; }
+  .tab.inactive .tab-text { color: #9DADC5; }
+
+  /* Android nav bar */
+  .nav-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 20px; background: #101827;
+  }
+</style>
+</head>
+<body>
+
+<!-- Android Status Bar -->
+<div class="status-bar">
+  <div class="status-time">9:41</div>
+  <div class="status-icons">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="#F4F1E8"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="#F4F1E8"><path d="M2 22h20V2z" opacity="0.3"/><path d="M2 22h20V2zm18-2H6.83L20 6.83z"/></svg>
+    <svg width="28" height="14" viewBox="0 0 28 14" fill="none">
+      <rect x="0.5" y="0.5" width="24" height="13" rx="2" stroke="#F4F1E8" stroke-opacity="0.4"/>
+      <rect x="2" y="2" width="16" height="10" rx="1" fill="#5DE0A6"/>
+      <rect x="26" y="4" width="2" height="6" rx="1" fill="#F4F1E8" fill-opacity="0.4"/>
+    </svg>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">
+    <div class="star">✦</div>
+    <div class="logo-text">NorthStar</div>
+  </div>
+  <div class="header-actions">
+    <div class="icon-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F4F1E8" stroke-width="2" stroke-linecap="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+    </div>
+    <div class="icon-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F4F1E8" stroke-width="2" stroke-linecap="round">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="content">
+
+  <!-- Greeting -->
+  <div class="greeting">
+    <div class="greeting-sub">Friday · August 15</div>
+    <div class="greeting-main">Good morning,<br>take it one step.</div>
+  </div>
+
+  <!-- Streak Card -->
+  <div class="card streak-card">
+    <div>
+      <div class="streak-label">Your Clear Day Streak</div>
+      <div class="streak-num">14 <span class="streak-unit">days</span></div>
+      <div class="streak-sub">A quiet streak, a real win.</div>
+    </div>
+    <div class="sun-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#F5B95D" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Next Meeting -->
+  <div class="card">
+    <div class="meeting-card">
+      <div class="meeting-info">
+        <div class="meeting-label">Next Meeting</div>
+        <div class="meeting-title">Night Lanterns</div>
+        <div class="meeting-meta">Remote · 7:00 PM · starts in 45 min</div>
+        <div class="btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#101827" stroke-width="2.5" stroke-linecap="round">
+            <path d="M23 7 16 12 23 17V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+          </svg>
+          Join room
+        </div>
+      </div>
+      <div class="meeting-badge">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2" stroke-linecap="round">
+          <path d="M23 7 16 12 23 17V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="quick-row">
+    <div class="quick">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#75B8FF" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+      </svg>
+      <div class="quick-text">Find a meeting</div>
+    </div>
+    <div class="quick">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#F5B95D" stroke-width="2" stroke-linecap="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+      <div class="quick-text">Write privately</div>
+    </div>
+    <div class="quick">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2" stroke-linecap="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <div class="quick-text">Connection, gently</div>
+    </div>
+    <div class="quick">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#9B59B6" stroke-width="2" stroke-linecap="round">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+      </svg>
+      <div class="quick-text">Learn by living</div>
+    </div>
+    <div class="quick">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#75B8FF" stroke-width="2" stroke-linecap="round">
+        <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+      </svg>
+      <div class="quick-text">Calm sounds</div>
+    </div>
+  </div>
+
+  <!-- Support bar -->
+  <div class="support-bar">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="#F5B95D">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+    </svg>
+    <div class="support-text">Need support now? · Call or text 988</div>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5B95D" stroke-width="2" stroke-linecap="round">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.59 1.23h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 15.92z"/>
+    </svg>
+  </div>
+
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar" style="bottom:20px;">
+  <div class="tab active">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#5DE0A6" stroke-width="2" stroke-linecap="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+    </svg>
+    <div class="tab-text active" style="color:#5DE0A6;">Today</div>
+  </div>
+  <div class="tab inactive">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+    </svg>
+    <div class="tab-text inactive" style="color:#9DADC5;">Meetings</div>
+  </div>
+  <div class="tab inactive">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </svg>
+    <div class="tab-text inactive" style="color:#9DADC5;">Learn</div>
+  </div>
+  <div class="tab inactive">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+    <div class="tab-text inactive" style="color:#9DADC5;">Connect</div>
+  </div>
+  <div class="tab inactive">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+    </svg>
+    <div class="tab-text inactive" style="color:#9DADC5;">Calm</div>
+  </div>
+  <div class="tab inactive">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#9DADC5" stroke-width="2" stroke-linecap="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+    </svg>
+    <div class="tab-text inactive" style="color:#9DADC5;">You</div>
+  </div>
+</div>
+
+<!-- Android navigation bar -->
+<div class="nav-bar"></div>
+
+</body>
+</html>
