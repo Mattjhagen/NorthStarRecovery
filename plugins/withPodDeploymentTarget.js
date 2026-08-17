@@ -22,12 +22,17 @@ const withPodDeploymentTarget = (config) => {
     end
   end
 
-  # Fix fmt consteval issue on Xcode 16
-  fmt_core_path = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt', 'core.h')
-  if File.exist?(fmt_core_path)
-    content = File.read(fmt_core_path)
-    content = content.gsub(/define\s+FMT_CONSTEVAL\s+consteval/, 'define FMT_CONSTEVAL constexpr')
-    File.write(fmt_core_path, content)
+  # Fix fmt consteval issue on Xcode 16 across all fmt headers
+  fmt_dir = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt')
+  if Dir.exist?(fmt_dir)
+    Dir.glob(File.join(fmt_dir, '*.h')).each do |header|
+      content = File.read(header)
+      if content.include?('consteval')
+        content = content.gsub(/define\s+FMT_CONSTEVAL\s+consteval/, 'define FMT_CONSTEVAL constexpr')
+        content = content.gsub(/consteval/, 'constexpr')
+        File.write(header, content)
+      end
+    end
   end
 `;
 
