@@ -718,8 +718,8 @@ function Onboarding({ onComplete }) {
     <SafeAreaView style={styles.onboardSafe}><ScrollView contentContainerStyle={styles.onboardScroll} automaticallyAdjustKeyboardInsets>
       <Text style={styles.onboardKicker}>WELCOME TO NORTHSTAR</Text><Text style={styles.onboardTitle}>Tell us a little about you.</Text>
       <Text style={styles.onboardCopy}>All optional. Only your pseudonym may be visible to other members.</Text>
-      <Field label="USERNAME" value={profile.pseudonym} onChange={v=>setProfile(p=>({...p,pseudonym:v}))} placeholder="How should we know you?" autoCapitalize="words"/>
-      <Text style={[styles.muted,{marginBottom:4}]}>A random username was generated for you. You can change it anytime.</Text>
+      <Field label="USERNAME (OPTIONAL)" value={profile.pseudonym} onChange={v=>setProfile(p=>({...p,pseudonym:v}))} placeholder="Leave blank for an anonymous name" autoCapitalize="words"/>
+      <Text style={[styles.muted,{marginBottom:4}]}>A random, anonymous username will be assigned to you to protect your privacy. You can change this later.</Text>
       <Field label="SOBRIETY DATE (OPTIONAL)" value={profile.sobrietyDate} onChange={v=>setProfile(p=>({...p,sobrietyDate:formatDateInput(v)}))} placeholder="MM/DD/YYYY"/>
       <Text style={styles.fieldLabel}>GROUP PREFERENCE</Text>
       <View style={styles.choiceWrap}>{['Women-only','Men-only','All groups'].map(x=><Choice key={x} label={x} active={profile.groupPreference===x} onPress={()=>setProfile(p=>({...p,groupPreference:x}))}/>)}</View>
@@ -1480,7 +1480,7 @@ function ReportSheet({ visible, target, onClose, say }) {
             </View>
             {target?.content ? (
               <View style={[styles.setting,{borderBottomWidth:0}]}>
-                <View style={{flex:1}}><Text style={styles.cardTitle}>Share content with moderator</Text><Text style={styles.muted}>Let the moderator see the reported content to make a decision.</Text></View>
+                <View style={{flex:1}}><Text style={styles.cardTitle}>Share content with moderator</Text><Text style={styles.muted}>This helps our moderation team understand the context. The reported content will be securely shared only with admins.</Text></View>
                 <Switch value={shareContent} onValueChange={setShareContent} trackColor={{false:C.line,true:'#3d9074'}} thumbColor={shareContent?C.mint:C.muted}/>
               </View>
             ) : null}

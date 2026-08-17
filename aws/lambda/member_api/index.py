@@ -380,7 +380,7 @@ def handler(event, context):
                         pointer = find_post(post_id)
                         if pointer:
                             comment_items = community.query(
-                                KeyConditionExpression=Key('pk').eq(f'COMMENTS#{post_id}'),
+                                KeyConditionExpression=Key('pk').eq(f'POST#{post_id}'),
                                 Limit=200).get('Items', [])
                             for ci in comment_items:
                                 if ci.get('commentId') == comment_id:
