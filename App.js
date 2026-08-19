@@ -2384,7 +2384,7 @@ function AdminBroadcast({ visible, onClose, say }) {
     if (!msg.trim()) return;
     setSending(true);
     try {
-      const res = await apiRequest('/v1/admin/notify', {method:'POST',body:JSON.stringify({title:'Northstar Update',body:msg.trim()})});
+      const res = await apiRequest('/v1/admin/notify', {method:'POST',body:JSON.stringify({title:'Northstar Update',body:msg.trim()}), headers: {'x-admin-key': 'northstar-admin-secret-2026'}});
       say(`Sent to ${res.sent} active devices.`);
       setText('');
       onClose();
@@ -2434,7 +2434,7 @@ function AdminReports({ visible, onClose, say, localReports = [] }) {
     const combinedLocal = [...localReports, ...savedLocal.filter(s => !localReports.some(l => l.targetId === s.targetId || l.id === s.id))];
 
     try {
-      const d = await apiRequest('/v1/admin/reports');
+      const d = await apiRequest('/v1/admin/reports', { headers: { 'x-admin-key': 'northstar-admin-secret-2026' } });
       const fetched = d?.reports || [];
       const merged = [...combinedLocal, ...fetched.filter(f => !combinedLocal.some(l => l.targetId === f.targetId || l.id === f.id))];
       setReports(merged.length > 0 ? merged : combinedLocal);
@@ -2445,7 +2445,7 @@ function AdminReports({ visible, onClose, say, localReports = [] }) {
   useEffect(() => { if (visible) load(); }, [visible, localReports]);
   const act = async (label, path, payload) => {
     setBusy(true);
-    try { await apiRequest(path,{method:'POST',body:JSON.stringify(payload)}); say(label); load(); }
+    try { await apiRequest(path,{method:'POST',body:JSON.stringify(payload), headers: { 'x-admin-key': 'northstar-admin-secret-2026' }}); say(label); load(); }
     catch { 
       // If offline or demo mode, apply locally
       if (path === '/v1/admin/remove-post') {

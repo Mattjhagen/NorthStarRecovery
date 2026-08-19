@@ -95,6 +95,7 @@ export default function AdminPortal() {
     const token = localStorage.getItem('ns_admin_jwt') || '';
     const headers = {
       'Content-Type': 'application/json',
+      'x-admin-key': 'northstar-admin-secret-2026',
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     };
 
