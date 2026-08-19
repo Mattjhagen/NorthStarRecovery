@@ -13,56 +13,53 @@
 ```text
 Dear Apple App Review Team,
 
-Thank you for your review and guidance on Northstar Recovery. Below is the requested detailed information to assist with completing your review under Guideline 2.1:
+Below is the information requested for Northstar Recovery under Guideline 2.1:
 
-1. DEMO ACCOUNT & SIGN-IN INSTRUCTIONS:
-- Demo Email: test@purepulse.one
-- Demo Password: [Insert your active test password, or use the in-app "Explore in demo mode" button on the welcome screen]
-- Account Deletion: Navigating to the "You" tab > "Delete account & data" allows complete and immediate account and data deletion from our servers.
-- Admin Review Features: The test account (test@purepulse.one) has full moderator access. In the "You" tab under ADMIN, tap "Review reports" to see moderation queues and device-level ban controls.
+1. DEMO ACCOUNT & SIGN-IN:
+- Email: test@purepulse.one
+- Password: [Insert your active test password, or tap 'Explore in demo mode' on the welcome screen]
+- Account Deletion Flow: In You tab > 'Delete account & data' permanently wipes profile, journals, and credentials from AWS.
+- Admin / Moderation Flow: test@purepulse.one has moderator rights. In You tab > ADMIN > 'Review reports' displays the moderation queue and device-level ban controls.
 
 2. PHYSICAL DEVICE TESTING MATRIX:
-The application has been thoroughly tested on physical devices running the latest iOS versions:
-- iPhone 15 Pro (iOS 17.5.1 and iOS 18.0)
+- iPhone 15 Pro (iOS 17.5.1, iOS 18.0)
 - iPhone 14 (iOS 17.5.1)
 - iPad Pro 11-inch (iPadOS 17.5)
 
 3. PURPOSE & TARGET AUDIENCE:
-- Purpose: Northstar Recovery is a non-clinical, private recovery companion designed to support individuals in recovery from substance addiction (specifically Crystal Meth Anonymous 12-step fellowship members and newcomers).
-- Problem Solved: Navigating early recovery is overwhelming. Northstar provides a gentle, privacy-first mobile hub to find peer meetings, maintain sobriety streak tracking, practice guided box-breathing, listen to calming audio soundscapes, and connect with peer sponsors safely.
-- Value: 100% free, anonymous-friendly peer companion without advertising, tracking, or clinical pressure.
+- Purpose: A private, non-clinical recovery companion supporting individuals recovering from addiction (Crystal Meth Anonymous 12-step fellowship).
+- Problem & Value: Provides a safe, anonymous hub for meeting discovery, sobriety streak tracking, guided box-breathing, CloudFront audio soundscapes, and peer connection without ads, tracking, or clinical pressure.
 
-4. INSTRUCTIONS FOR ACCESSING MAIN FEATURES:
-- Today Tab: Displays personalized greeting, anonymous sobriety streak counter (with reveal/hide toggle), next upcoming CMA meeting within 3 hours, and a 1-tap 988 crisis hotline / sponsor shortcut.
-- Meetings Tab: Live Crystal Meth Anonymous directory filtered by All, Remote, In-Person, or Hybrid meetings, with 1-tap video join links.
-- Learn Tab: 9 progressive recovery modules with XP tracking, narrated CMA literature pamphlets, and live scientific recovery news from NIDA.
-- Calm Tab: 29 ambient soundscapes streamed via CloudFront with guided 4-2-4-2 box breathing visualizer and session timers.
-- Connect Tab (Community Circle): Private peer message board with Questions, Stories, and Check-ins. Users can tap any member profile to "Block Member" or report posts/comments to moderators.
-- Messages Tab: 1-on-1 private direct messaging with push notifications and in-conversation report/block actions.
-- You Tab: Manage profile pseudonym, sobriety date, sponsor/trusted person contact, notification preferences, terms of use, privacy policy, medical disclaimer, and one-tap "Delete account & data".
+4. CORE FEATURE NAVIGATION:
+- Today: Anonymous sobriety streak counter, next CMA meeting within 3h, and 1-tap 988 crisis hotline / sponsor shortcut.
+- Meetings: Live CMA directory (crystalmeth.org API) with format filters and 1-tap video join links.
+- Learn: 9 progressive recovery modules with XP, narrated literature audio, and NIDA science news.
+- Calm: 29 streamed soundscapes with 4-2-4-2 box breathing visualizer and timers.
+- Connect (Circle): Peer message board. Tap any member profile to block them; long press or tap flag to report posts/comments to admins.
+- Messages: Private 1-on-1 messaging with push alerts and report/block actions.
+- You: Profile settings, notification toggles, Terms of Service (EULA), Privacy Policy, Medical Disclaimer, and 'Delete account & data'.
 
-5. EXTERNAL SERVICES & INFRASTRUCTURE:
-- AWS Cognito: Secure user authentication and JWT session management.
-- AWS API Gateway & AWS Lambda: Serverless REST API backend.
-- Amazon DynamoDB: Encrypted database storing member profiles, recovery journals, moderation reports, and banned device identifiers.
-- Amazon CloudFront CDN: High-speed streaming origin for audio soundscapes and narrated literature audio.
-- Crystal Meth Anonymous Meeting Directory API (crystalmeth.org): Public directory feed for worldwide recovery meeting discovery.
-- Jitsi Meet (meet.jit.si): Open-source WebRTC peer meeting rooms.
-- Expo Application Services (EAS) Push Notifications: For meeting reminders and direct message alerts.
-- National Institute on Drug Abuse (NIDA) RSS Feed: Evidence-based recovery science news.
+5. EXTERNAL SERVICES & PLATFORMS:
+- AWS Cognito: Secure authentication & JWT session management.
+- AWS API Gateway & Lambda: Serverless REST API backend.
+- Amazon DynamoDB: Encrypted database for profiles, journals, reports, and banned devices.
+- Amazon CloudFront CDN: Streams audio soundscapes and readings.
+- Crystal Meth Anonymous API (crystalmeth.org): Public meeting directory data.
+- Jitsi Meet (meet.jit.si): WebRTC peer video rooms.
+- Expo Push Services (EAS): Meeting reminders and DM alerts.
+- NIDA RSS Feed: Evidence-based recovery news.
 
 6. REGIONAL DIFFERENCES:
-The application operates identically and consistently across all countries and regions worldwide without geo-restrictions.
+The app functions identically and consistently worldwide with no geo-restrictions.
 
-7. REGULATORY & THIRD-PARTY DISCLOSURES:
-- Non-Clinical Status: Northstar Recovery is strictly an informational and peer-support tool. It does not provide medical advice, psychiatric diagnosis, or clinical addiction treatment (Guideline 1.4 compliant). A clear Medical & Crisis Disclaimer is prominently integrated into the app settings and web terms.
-- Emergency Support: Direct 988 Suicide & Crisis Lifeline integration is provided for immediate urgent assistance.
-- CMA Fellowship Independence: Northstar is an independent project and is not officially affiliated with or endorsed by CMA World Services. The app does not republish copyrighted text; meeting listings and literature links redirect directly to official public sources (crystalmeth.org).
-- In-App Purchases / Free App: Northstar contains NO paid content, NO subscriptions, and NO digital purchases. All features and tools are 100% free for all users.
+7. REGULATORY, MEDICAL & THIRD-PARTY DISCLOSURES:
+- Non-Clinical Status: Strictly an informational peer-support companion; does not provide medical advice, diagnosis, or clinical addiction treatment (Guideline 1.4). Includes clear in-app Medical Disclaimers and direct 988 Lifeline integration.
+- Independence: Independent project not affiliated with or endorsed by CMA World Services. Direct links to official public sources (crystalmeth.org) respect copyright.
+- Free Application: 100% free with NO paid tiers, subscriptions, or digital purchases.
 
-A physical device screen recording demonstrating the complete user flow (onboarding, login, account deletion, permission prompts, and UGC block/report mechanisms) has been attached to this submission.
+A physical device screen recording demonstrating the complete user flow (onboarding, login, account deletion, permission prompts, and UGC block/report mechanisms) is attached.
 
-Please let us know if any additional information is needed.
+Please let us know if any additional details are needed.
 ```
 
 ---
