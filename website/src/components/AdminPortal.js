@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Shield, Users, Bell, Mail, Trash2, Ban, RefreshCw, 
-  CheckCircle, AlertTriangle, LogOut, Send, Eye, EyeOff, Lock,
-  Activity, ArrowLeft, ExternalLink, Sparkles
+  CheckCircle, LogOut, Send, Eye, EyeOff, Lock,
+  Activity, ArrowLeft, ExternalLink, Sparkles, MapPin, 
+  Smartphone, Apple, Globe, Radio, X
 } from 'lucide-react';
 import './AdminPortal.css';
 
@@ -14,6 +15,8 @@ export default function AdminPortal() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem('ns_admin_auth')));
   const [activeTab, setActiveTab] = useState('overview');
   const [toast, setToast] = useState('');
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userFilter, setUserFilter] = useState('all');
 
   // Overview Stats
   const [stats] = useState({
@@ -21,7 +24,12 @@ export default function AdminPortal() {
     bannedUsers: 2,
     activePushDevices: 98,
     availableSponsors: 18,
-    pendingReports: 3
+    pendingReports: 0,
+    iosDevices: 97,
+    androidDevices: 45,
+    sosGuardians: 34,
+    avgSobrietyDays: 284,
+    checkinRate: 76
   });
 
   // Reports
@@ -36,26 +44,158 @@ export default function AdminPortal() {
       reason: 'Harassment or abusive language',
       snippet: 'This is an example reported snippet that violates community boundaries.',
       createdAt: new Date(Date.now() - 3600000).toISOString()
-    },
-    {
-      id: 'rep-2',
-      targetType: 'message',
-      targetId: 'thread-55',
-      author: 'SuspiciousAccount',
-      authorId: 'user-89',
-      reporterName: 'SerenityNow',
-      reason: 'Selling illegal substances / spam',
-      snippet: 'Contact me outside for supplies...',
-      createdAt: new Date(Date.now() - 14400000).toISOString()
     }
   ]);
 
-  // Users Directory
+  // Users Directory with rich telemetry
   const [users, setUsers] = useState([
-    { memberId: 'user-1', pseudonym: 'Matty (Admin)', bio: 'Northstar Admin', sobrietyDate: '01/01/2020', xp: 450, banned: false, deviceCount: 2, hasPushToken: true, sponsorAvailable: true },
-    { memberId: 'user-77', pseudonym: 'Anonymous Member', bio: 'One day at a time', sobrietyDate: '05/12/2023', xp: 80, banned: false, deviceCount: 1, hasPushToken: true, sponsorAvailable: false },
-    { memberId: 'user-89', pseudonym: 'SuspiciousAccount', bio: '', sobrietyDate: '', xp: 0, banned: true, deviceCount: 1, hasPushToken: false, sponsorAvailable: false },
-    { memberId: 'user-104', pseudonym: 'SoberPathFinder', bio: 'Willing to sponsor newcomers', sobrietyDate: '08/19/2021', xp: 210, banned: false, deviceCount: 1, hasPushToken: true, sponsorAvailable: true }
+    {
+      memberId: 'user-1',
+      pseudonym: 'Matty (Admin)',
+      email: 'matty@purepulse.one',
+      bio: 'Northstar Developer & Fellow in Recovery',
+      gender: 'Male / Men\'s focus',
+      sobrietyDate: '2020-01-01',
+      xp: 450,
+      banned: false,
+      deviceType: 'iOS',
+      deviceModel: 'iPhone 15 Pro (iOS 17.5.1)',
+      deviceId: 'A8B7C6D5-E4F3-4A2B-9C8D-1E2F3A4B5C6D',
+      hasPushToken: true,
+      sponsorAvailable: true,
+      sponsorNote: 'Available to sponsor newcomers in early recovery.',
+      location: 'Los Angeles, CA',
+      coordinates: '34.05, -118.24',
+      sosOptIn: true,
+      lastActive: 'Just now',
+      appVersion: 'v1.0.1'
+    },
+    {
+      memberId: 'user-77',
+      pseudonym: 'GentleRiver42',
+      email: 'member77@recovery.org',
+      bio: 'One day at a time. Finding my feet in CMA.',
+      gender: 'Co-ed / All Welcome',
+      sobrietyDate: '2024-04-10',
+      xp: 130,
+      banned: false,
+      deviceType: 'iOS',
+      deviceModel: 'iPhone 14 (iOS 17.4)',
+      deviceId: 'F1E2D3C4-B5A6-4789-8012-3456789ABCDE',
+      hasPushToken: true,
+      sponsorAvailable: false,
+      sponsorNote: '',
+      location: 'San Francisco, CA',
+      coordinates: '37.77, -122.41',
+      sosOptIn: true,
+      lastActive: '12m ago',
+      appVersion: 'v1.0.1'
+    },
+    {
+      memberId: 'user-104',
+      pseudonym: 'SoberPathFinder',
+      email: 'pathfinder@cmafellowship.net',
+      bio: '5 years clean. Step work changed my life.',
+      gender: 'LGBTQ+ Focus',
+      sobrietyDate: '2019-08-19',
+      xp: 320,
+      banned: false,
+      deviceType: 'Android',
+      deviceModel: 'Google Pixel 8 (Android 14)',
+      deviceId: '4a3b2c1d0e9f8a7b',
+      hasPushToken: true,
+      sponsorAvailable: true,
+      sponsorNote: 'Willing to take members through the 12 Steps.',
+      location: 'New York, NY',
+      coordinates: '40.71, -74.00',
+      sosOptIn: true,
+      lastActive: '1h ago',
+      appVersion: 'v1.0.1'
+    },
+    {
+      memberId: 'user-89',
+      pseudonym: 'SuspiciousAccount',
+      email: 'spammer89@tempmail.com',
+      bio: 'Contact me outside for supplies...',
+      gender: '',
+      sobrietyDate: '',
+      xp: 0,
+      banned: true,
+      deviceType: 'Android',
+      deviceModel: 'Samsung Galaxy A14',
+      deviceId: 'b8a7f6e5d4c3b2a1',
+      hasPushToken: false,
+      sponsorAvailable: false,
+      sponsorNote: '',
+      location: 'Chicago, IL',
+      coordinates: '41.87, -87.62',
+      sosOptIn: false,
+      lastActive: '3d ago',
+      appVersion: 'v1.0.0'
+    },
+    {
+      memberId: 'user-152',
+      pseudonym: 'SereneSummit19',
+      email: 'serene19@gmail.com',
+      bio: 'Grateful for another 24 hours.',
+      gender: 'Women\'s Focus',
+      sobrietyDate: '2023-11-05',
+      xp: 240,
+      banned: false,
+      deviceType: 'iOS',
+      deviceModel: 'iPhone 13 Pro',
+      deviceId: 'C9D8E7F6-A5B4-4321-8765-FEDCBA987654',
+      hasPushToken: true,
+      sponsorAvailable: true,
+      sponsorNote: 'Available for evening calls and check-ins.',
+      location: 'Austin, TX',
+      coordinates: '30.26, -97.74',
+      sosOptIn: true,
+      lastActive: '2h ago',
+      appVersion: 'v1.0.1'
+    },
+    {
+      memberId: 'user-203',
+      pseudonym: 'QuietBeacon88',
+      email: 'beacon88@outlook.com',
+      bio: 'Newcomer in early recovery.',
+      gender: 'All welcome',
+      sobrietyDate: '2024-07-28',
+      xp: 60,
+      banned: false,
+      deviceType: 'Android',
+      deviceModel: 'OnePlus 11 (Android 14)',
+      deviceId: '7c8b9a0f1e2d3c4b',
+      hasPushToken: true,
+      sponsorAvailable: false,
+      sponsorNote: '',
+      location: 'Seattle, WA',
+      coordinates: '47.60, -122.33',
+      sosOptIn: false,
+      lastActive: '4h ago',
+      appVersion: 'v1.0.1'
+    },
+    {
+      memberId: 'user-314',
+      pseudonym: 'GoldenHaven12',
+      email: 'goldenhaven@gmail.com',
+      bio: 'Taking it one breath at a time.',
+      gender: 'Co-ed',
+      sobrietyDate: '2022-03-15',
+      xp: 290,
+      banned: false,
+      deviceType: 'iOS',
+      deviceModel: 'iPhone 15 (iOS 17.5)',
+      deviceId: '3E4F5A6B-7C8D-9E0F-1A2B-3C4D5E6F7A8B',
+      hasPushToken: true,
+      sponsorAvailable: false,
+      sponsorNote: '',
+      location: 'Toronto, ON (Canada)',
+      coordinates: '43.65, -79.38',
+      sosOptIn: true,
+      lastActive: '30m ago',
+      appVersion: 'v1.0.1'
+    }
   ]);
   const [userSearch, setUserSearch] = useState('');
 
@@ -87,6 +227,12 @@ export default function AdminPortal() {
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 3500);
+  };
+
+  const calculateDays = (dateStr) => {
+    if (!dateStr) return 0;
+    const diff = Date.now() - new Date(dateStr).getTime();
+    return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
   };
 
   const handleLogin = (e) => {
@@ -220,11 +366,17 @@ export default function AdminPortal() {
   const handleSuspendUser = (memberId, banDevice = false) => {
     setUsers(prev => prev.map(u => u.memberId === memberId ? { ...u, banned: true } : u));
     setReports(prev => prev.filter(r => r.authorId !== memberId));
+    if (selectedUser && selectedUser.memberId === memberId) {
+      setSelectedUser(prev => ({ ...prev, banned: true }));
+    }
     showToast(banDevice ? `Member & device hardware banned.` : `Member suspended.`);
   };
 
   const handleRestoreUser = (memberId) => {
     setUsers(prev => prev.map(u => u.memberId === memberId ? { ...u, banned: false } : u));
+    if (selectedUser && selectedUser.memberId === memberId) {
+      setSelectedUser(prev => ({ ...prev, banned: false }));
+    }
     showToast(`Member restored.`);
   };
 
@@ -511,10 +663,19 @@ export default function AdminPortal() {
     );
   }
 
-  const filteredUsers = users.filter(u => 
-    u.pseudonym.toLowerCase().includes(userSearch.toLowerCase()) || 
-    u.memberId.toLowerCase().includes(userSearch.toLowerCase())
-  );
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = u.pseudonym.toLowerCase().includes(userSearch.toLowerCase()) || 
+      u.memberId.toLowerCase().includes(userSearch.toLowerCase()) ||
+      (u.location && u.location.toLowerCase().includes(userSearch.toLowerCase()));
+
+    if (!matchesSearch) return false;
+    if (userFilter === 'ios') return u.deviceType === 'iOS';
+    if (userFilter === 'android') return u.deviceType === 'Android';
+    if (userFilter === 'sos') return u.sosOptIn;
+    if (userFilter === 'sponsors') return u.sponsorAvailable;
+    if (userFilter === 'banned') return u.banned;
+    return true;
+  });
 
   return (
     <div className="ns-admin-app">
@@ -551,6 +712,14 @@ export default function AdminPortal() {
           >
             <Activity size={18} />
             <span>Overview</span>
+          </button>
+
+          <button 
+            className={`ns-admin-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => setActiveTab('analytics')}
+          >
+            <Globe size={18} />
+            <span>Devices & Regions</span>
           </button>
           
           <button 
@@ -592,7 +761,7 @@ export default function AdminPortal() {
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
             <div>
-              <h1 className="ns-admin-page-title">System Overview</h1>
+              <h1 className="ns-admin-page-title">System Overview & Telemetry</h1>
               <p className="ns-admin-page-sub">Real-time statistics for Northstar Recovery companion network.</p>
 
               <div className="ns-admin-grid-4">
@@ -613,10 +782,10 @@ export default function AdminPortal() {
                 </div>
 
                 <div className="ns-stat-card">
-                  <span className="ns-stat-label">Pending Reports</span>
+                  <span className="ns-stat-label">SOS Guardians</span>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span className="ns-stat-val" style={{ color: reports.length ? '#EF4444' : '#5DE0A6' }}>{reports.length}</span>
-                    <AlertTriangle size={28} color="#EF4444" className="ns-stat-icon" />
+                    <span className="ns-stat-val" style={{ color: '#5DE0A6' }}>{stats.sosGuardians}</span>
+                    <Radio size={28} color="#5DE0A6" className="ns-stat-icon" />
                   </div>
                 </div>
 
@@ -629,13 +798,107 @@ export default function AdminPortal() {
                 </div>
               </div>
 
+              {/* Insights Breakdown Grid */}
+              <div className="ns-admin-grid-2">
+                {/* Platform Breakdown */}
+                <div className="ns-card">
+                  <div className="ns-card-header">
+                    <h2 className="ns-card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Smartphone size={18} color="#5DE0A6" /> Device Platform Split
+                    </h2>
+                    <span style={{ fontSize: 13, color: '#9DADC5' }}>{stats.totalUsers} Total Hardware IDs</span>
+                  </div>
+
+                  <div className="ns-meter-row">
+                    <div className="ns-meter-header">
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Apple size={14} /> Apple iOS (68%)
+                      </span>
+                      <span>{stats.iosDevices} devices</span>
+                    </div>
+                    <div className="ns-progress-track">
+                      <div className="ns-progress-bar" style={{ width: '68%', background: '#F4F1E8' }} />
+                    </div>
+                  </div>
+
+                  <div className="ns-meter-row">
+                    <div className="ns-meter-header">
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Smartphone size={14} /> Google Android (32%)
+                      </span>
+                      <span>{stats.androidDevices} devices</span>
+                    </div>
+                    <div className="ns-progress-track">
+                      <div className="ns-progress-bar" style={{ width: '32%', background: '#5DE0A6' }} />
+                    </div>
+                  </div>
+
+                  <p style={{ color: '#9DADC5', fontSize: 12, marginTop: 14 }}>
+                    • iOS Vendor IDs & Android hardware IDs are tracked for device-level suspensions to prevent account recreation.
+                  </p>
+                </div>
+
+                {/* Regional Activity */}
+                <div className="ns-card">
+                  <div className="ns-card-header">
+                    <h2 className="ns-card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <MapPin size={18} color="#75B8FF" /> Top Member Regions (Coarse)
+                    </h2>
+                    <span className="ns-tag ns-tag-active">34 SOS Guardians</span>
+                  </div>
+
+                  <div className="ns-meter-row">
+                    <div className="ns-meter-header">
+                      <span>🇺🇸 US West Coast (LA, SF, Seattle)</span>
+                      <span>42% (60 members)</span>
+                    </div>
+                    <div className="ns-progress-track">
+                      <div className="ns-progress-bar" style={{ width: '42%', background: '#75B8FF' }} />
+                    </div>
+                  </div>
+
+                  <div className="ns-meter-row">
+                    <div className="ns-meter-header">
+                      <span>🇺🇸 US East Coast (NYC, Miami, Boston)</span>
+                      <span>31% (44 members)</span>
+                    </div>
+                    <div className="ns-progress-track">
+                      <div className="ns-progress-bar" style={{ width: '31%', background: '#5DE0A6' }} />
+                    </div>
+                  </div>
+
+                  <div className="ns-meter-row">
+                    <div className="ns-meter-header">
+                      <span>🇺🇸 US Midwest & South (Chicago, Austin)</span>
+                      <span>18% (26 members)</span>
+                    </div>
+                    <div className="ns-progress-track">
+                      <div className="ns-progress-bar" style={{ width: '18%', background: '#F5B95D' }} />
+                    </div>
+                  </div>
+
+                  <div className="ns-meter-row">
+                    <div className="ns-meter-header">
+                      <span>🇨🇦 🇬🇧 International (Canada, UK, Europe)</span>
+                      <span>9% (12 members)</span>
+                    </div>
+                    <div className="ns-progress-track">
+                      <div className="ns-progress-bar" style={{ width: '9%', background: '#A78BFA' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="ns-card">
                 <div className="ns-card-header">
                   <h2 className="ns-card-title">Quick Actions</h2>
                 </div>
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                  <button className="ns-btn ns-btn-primary" onClick={() => setActiveTab('reports')}>
-                    <Shield size={16} /> Review {reports.length} Reports
+                  <button className="ns-btn ns-btn-primary" onClick={() => setActiveTab('users')}>
+                    <Users size={16} /> Inspect {users.length} Member Accounts
+                  </button>
+                  <button className="ns-btn ns-btn-secondary" onClick={() => setActiveTab('analytics')}>
+                    <Globe size={16} /> View Geographic Telemetry
                   </button>
                   <button className="ns-btn ns-btn-secondary" onClick={() => setActiveTab('push')}>
                     <Bell size={16} /> Send Push Broadcast
@@ -648,7 +911,115 @@ export default function AdminPortal() {
             </div>
           )}
 
-          {/* TAB 2: REPORTS & MODERATION */}
+          {/* TAB 2: GEOGRAPHIC & DEVICE ANALYTICS */}
+          {activeTab === 'analytics' && (
+            <div>
+              <h1 className="ns-admin-page-title">Devices & Geographic Telemetry</h1>
+              <p className="ns-admin-page-sub">Telemetry on mobile hardware, operating systems, coarse regions, and SOS guardian locations.</p>
+
+              <div className="ns-admin-grid-4">
+                <div className="ns-stat-card">
+                  <span className="ns-stat-label">iOS Installations</span>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span className="ns-stat-val">{stats.iosDevices}</span>
+                    <Apple size={28} color="#F4F1E8" className="ns-stat-icon" />
+                  </div>
+                </div>
+
+                <div className="ns-stat-card">
+                  <span className="ns-stat-label">Android Installations</span>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span className="ns-stat-val">{stats.androidDevices}</span>
+                    <Smartphone size={28} color="#5DE0A6" className="ns-stat-icon" />
+                  </div>
+                </div>
+
+                <div className="ns-stat-card">
+                  <span className="ns-stat-label">Avg. Sobriety Streak</span>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span className="ns-stat-val">{stats.avgSobrietyDays}d</span>
+                    <Sparkles size={28} color="#F5B95D" className="ns-stat-icon" />
+                  </div>
+                </div>
+
+                <div className="ns-stat-card">
+                  <span className="ns-stat-label">Daily Check-in Rate</span>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span className="ns-stat-val">{stats.checkinRate}%</span>
+                    <Activity size={28} color="#75B8FF" className="ns-stat-icon" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Geographic Cluster Table */}
+              <div className="ns-card">
+                <div className="ns-card-header">
+                  <h2 className="ns-card-title">Coarse Location Clusters & SOS Network</h2>
+                  <span style={{ fontSize: 13, color: '#9DADC5' }}>Coarse ~1km city-level privacy preservation</span>
+                </div>
+
+                <div className="ns-table-wrap">
+                  <table className="ns-admin-table">
+                    <thead>
+                      <tr>
+                        <th>City / Region</th>
+                        <th>Coarse Coordinates</th>
+                        <th>Active Members</th>
+                        <th>SOS Peer Guardians</th>
+                        <th>Top Device Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Los Angeles, CA</strong></td>
+                        <td><code>34.05, -118.24</code></td>
+                        <td>38 members</td>
+                        <td><span className="ns-tag ns-tag-active">14 Guardians</span></td>
+                        <td><span className="ns-device-pill ns-device-ios">iOS (74%)</span></td>
+                      </tr>
+                      <tr>
+                        <td><strong>New York, NY</strong></td>
+                        <td><code>40.71, -74.00</code></td>
+                        <td>31 members</td>
+                        <td><span className="ns-tag ns-tag-active">9 Guardians</span></td>
+                        <td><span className="ns-device-pill ns-device-ios">iOS (68%)</span></td>
+                      </tr>
+                      <tr>
+                        <td><strong>San Francisco, CA</strong></td>
+                        <td><code>37.77, -122.41</code></td>
+                        <td>22 members</td>
+                        <td><span className="ns-tag ns-tag-active">6 Guardians</span></td>
+                        <td><span className="ns-device-pill ns-device-ios">iOS (70%)</span></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Chicago, IL</strong></td>
+                        <td><code>41.87, -87.62</code></td>
+                        <td>16 members</td>
+                        <td><span className="ns-tag ns-tag-warn">2 Guardians</span></td>
+                        <td><span className="ns-device-pill ns-device-android">Android (56%)</span></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Austin, TX</strong></td>
+                        <td><code>30.26, -97.74</code></td>
+                        <td>14 members</td>
+                        <td><span className="ns-tag ns-tag-active">3 Guardians</span></td>
+                        <td><span className="ns-device-pill ns-device-ios">iOS (64%)</span></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Toronto, ON (Canada)</strong></td>
+                        <td><code>43.65, -79.38</code></td>
+                        <td>8 members</td>
+                        <td><span className="ns-tag ns-tag-active">2 Guardians</span></td>
+                        <td><span className="ns-device-pill ns-device-ios">iOS (62%)</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: REPORTS & MODERATION */}
           {activeTab === 'reports' && (
             <div>
               <h1 className="ns-admin-page-title">Moderation & User Reports</h1>
@@ -700,23 +1071,41 @@ export default function AdminPortal() {
             </div>
           )}
 
-          {/* TAB 3: USERS & BANS */}
+          {/* TAB 4: USERS & MEMBERS DIRECTORY */}
           {activeTab === 'users' && (
             <div>
-              <h1 className="ns-admin-page-title">Members & Hardware Bans</h1>
-              <p className="ns-admin-page-sub">Manage user accounts and view hardware device bans across iOS and Android.</p>
+              <h1 className="ns-admin-page-title">Members, Devices & Locations</h1>
+              <p className="ns-admin-page-sub">Click on any member to inspect hardware identifiers, location coordinates, and recovery streak.</p>
 
               <div className="ns-card">
                 <div className="ns-card-header">
                   <input 
                     type="text" 
                     className="ns-input" 
-                    placeholder="Search by pseudonym or ID..." 
+                    placeholder="Search by name, ID, or city..." 
                     value={userSearch} 
                     onChange={(e) => setUserSearch(e.target.value)}
-                    style={{ width: 320 }}
+                    style={{ width: 280 }}
                   />
-                  <span style={{ color: '#9DADC5', fontSize: 13 }}>Showing {filteredUsers.length} members</span>
+
+                  {/* Filter Pills */}
+                  <div className="ns-filter-group">
+                    <button className={`ns-filter-pill ${userFilter === 'all' ? 'active' : ''}`} onClick={() => setUserFilter('all')}>
+                      All ({users.length})
+                    </button>
+                    <button className={`ns-filter-pill ${userFilter === 'ios' ? 'active' : ''}`} onClick={() => setUserFilter('ios')}>
+                      <Apple size={12} style={{ display: 'inline', marginRight: 4 }} /> iOS
+                    </button>
+                    <button className={`ns-filter-pill ${userFilter === 'android' ? 'active' : ''}`} onClick={() => setUserFilter('android')}>
+                      <Smartphone size={12} style={{ display: 'inline', marginRight: 4 }} /> Android
+                    </button>
+                    <button className={`ns-filter-pill ${userFilter === 'sos' ? 'active' : ''}`} onClick={() => setUserFilter('sos')}>
+                      <Radio size={12} style={{ display: 'inline', marginRight: 4 }} /> SOS Active
+                    </button>
+                    <button className={`ns-filter-pill ${userFilter === 'sponsors' ? 'active' : ''}`} onClick={() => setUserFilter('sponsors')}>
+                      <Sparkles size={12} style={{ display: 'inline', marginRight: 4 }} /> Sponsors
+                    </button>
+                  </div>
                 </div>
 
                 <div className="ns-table-wrap">
@@ -724,19 +1113,45 @@ export default function AdminPortal() {
                     <thead>
                       <tr>
                         <th>Member</th>
+                        <th>Device & OS</th>
+                        <th>Coarse Location</th>
+                        <th>Sobriety Days</th>
+                        <th>XP Level</th>
                         <th>Status</th>
-                        <th>Sobriety Date</th>
-                        <th>XP</th>
-                        <th>Devices</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredUsers.map(u => (
-                        <tr key={u.memberId}>
+                        <tr key={u.memberId} className="ns-clickable-row" onClick={() => setSelectedUser(u)}>
                           <td>
                             <strong>{u.pseudonym}</strong>
                             <div style={{ color: '#9DADC5', fontSize: 11 }}>{u.memberId}</div>
+                          </td>
+                          <td>
+                            {u.deviceType === 'iOS' ? (
+                              <span className="ns-device-pill ns-device-ios"><Apple size={12} /> {u.deviceModel || 'iPhone'}</span>
+                            ) : (
+                              <span className="ns-device-pill ns-device-android"><Smartphone size={12} /> {u.deviceModel || 'Android'}</span>
+                            )}
+                            <div style={{ color: '#64748b', fontSize: 11, marginTop: 2, fontFamily: 'monospace' }}>
+                              ID: {u.deviceId ? u.deviceId.slice(0, 10) + '...' : 'N/A'}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="ns-location-tag">
+                              <MapPin size={13} color="#75B8FF" /> {u.location || 'Unknown'}
+                            </div>
+                            {u.sosOptIn && (
+                              <span style={{ fontSize: 10, color: '#5DE0A6', fontWeight: 700 }}>● SOS Active</span>
+                            )}
+                          </td>
+                          <td>
+                            <strong>{calculateDays(u.sobrietyDate)}d</strong>
+                            <div style={{ color: '#9DADC5', fontSize: 11 }}>{u.sobrietyDate || 'Not set'}</div>
+                          </td>
+                          <td>
+                            <span style={{ color: '#F5B95D', fontWeight: 700 }}>{u.xp} XP</span>
                           </td>
                           <td>
                             {u.banned ? (
@@ -745,21 +1160,18 @@ export default function AdminPortal() {
                               <span className="ns-tag ns-tag-active">Active</span>
                             )}
                           </td>
-                          <td>{u.sobrietyDate || 'Not set'}</td>
-                          <td>{u.xp} XP</td>
-                          <td>{u.deviceCount} device(s)</td>
-                          <td>
+                          <td onClick={(e) => e.stopPropagation()}>
                             {u.banned ? (
                               <button className="ns-btn ns-btn-secondary ns-btn-sm" onClick={() => handleRestoreUser(u.memberId)}>
                                 <RefreshCw size={13} color="#5DE0A6" /> Restore
                               </button>
                             ) : (
                               <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="ns-btn ns-btn-secondary ns-btn-sm" onClick={() => setSelectedUser(u)}>
+                                  Inspect
+                                </button>
                                 <button className="ns-btn ns-btn-danger ns-btn-sm" onClick={() => handleSuspendUser(u.memberId, false)}>
                                   Suspend
-                                </button>
-                                <button className="ns-btn ns-btn-danger ns-btn-sm" onClick={() => handleSuspendUser(u.memberId, true)}>
-                                  Ban Device
                                 </button>
                               </div>
                             )}
@@ -773,7 +1185,7 @@ export default function AdminPortal() {
             </div>
           )}
 
-          {/* TAB 4: PUSH NOTIFICATION BLASTS */}
+          {/* TAB 5: PUSH NOTIFICATION BLASTS */}
           {activeTab === 'push' && (
             <div>
               <h1 className="ns-admin-page-title">Push Notification Blast</h1>
@@ -796,7 +1208,7 @@ export default function AdminPortal() {
                     className="ns-textarea" 
                     placeholder="Type your message to members..." 
                     value={pushBody} 
-                    onChange={(e) => setPushBody(e.target.value)}
+                    onChange={(e) => setPushBody(e.target.value)} 
                   />
                 </div>
 
@@ -826,7 +1238,7 @@ export default function AdminPortal() {
             </div>
           )}
 
-          {/* TAB 5: RESEND EMAIL BLASTS */}
+          {/* TAB 6: RESEND EMAIL BLASTS */}
           {activeTab === 'email' && (
             <div>
               <h1 className="ns-admin-page-title">Resend Email Blasts & Account Alerts</h1>
@@ -926,7 +1338,7 @@ export default function AdminPortal() {
                       style={{ minHeight: 180, fontFamily: 'monospace', fontSize: 13 }}
                       placeholder="<p>Write HTML email here...</p>" 
                       value={emailBodyHtml} 
-                      onChange={(e) => setEmailBodyHtml(e.target.value)}
+                      onChange={(e) => setEmailBodyHtml(e.target.value)} 
                     />
                   )}
                 </div>
@@ -943,6 +1355,115 @@ export default function AdminPortal() {
           )}
         </main>
       </div>
+
+      {/* MEMBER DETAIL INSPECTOR MODAL */}
+      {selectedUser && (
+        <div className="ns-modal-backdrop" onClick={() => setSelectedUser(null)}>
+          <div className="ns-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <span className={`ns-tag ${selectedUser.banned ? 'ns-tag-banned' : 'ns-tag-active'}`}>
+                  {selectedUser.banned ? 'ACCOUNT SUSPENDED' : 'ACTIVE MEMBER'}
+                </span>
+                <h2 style={{ fontSize: 22, fontWeight: 900, marginTop: 8, color: '#F4F1E8' }}>{selectedUser.pseudonym}</h2>
+                <span style={{ color: '#9DADC5', fontSize: 12 }}>ID: {selectedUser.memberId}</span>
+              </div>
+              <button 
+                onClick={() => setSelectedUser(null)} 
+                style={{ background: 'none', border: 'none', color: '#9DADC5', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Profile Bio */}
+            {selectedUser.bio && (
+              <p style={{ fontStyle: 'italic', color: '#cbd5e1', background: '#0b1426', padding: 12, borderRadius: 8, fontSize: 13 }}>
+                "{selectedUser.bio}"
+              </p>
+            )}
+
+            {/* Hardware & Location Details */}
+            <div className="ns-detail-grid">
+              <div className="ns-detail-item">
+                <span className="ns-detail-kicker">Device Platform</span>
+                <span className="ns-detail-val" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {selectedUser.deviceType === 'iOS' ? <Apple size={14} /> : <Smartphone size={14} />}
+                  {selectedUser.deviceModel || selectedUser.deviceType}
+                </span>
+              </div>
+
+              <div className="ns-detail-item">
+                <span className="ns-detail-kicker">App Version</span>
+                <span className="ns-detail-val">{selectedUser.appVersion || 'v1.0.1'}</span>
+              </div>
+
+              <div className="ns-detail-item">
+                <span className="ns-detail-kicker">Hardware Device ID</span>
+                <span className="ns-detail-val" style={{ fontFamily: 'monospace', fontSize: 11, color: '#75B8FF', wordBreak: 'break-all' }}>
+                  {selectedUser.deviceId || 'Not registered'}
+                </span>
+              </div>
+
+              <div className="ns-detail-item">
+                <span className="ns-detail-kicker">Push Notifications</span>
+                <span className="ns-detail-val" style={{ color: selectedUser.hasPushToken ? '#5DE0A6' : '#9DADC5' }}>
+                  {selectedUser.hasPushToken ? '● Token Active' : '○ Not enabled'}
+                </span>
+              </div>
+
+              <div className="ns-detail-item">
+                <span className="ns-detail-kicker">Coarse Location</span>
+                <span className="ns-detail-val" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <MapPin size={13} color="#75B8FF" /> {selectedUser.location || 'Unknown'}
+                </span>
+              </div>
+
+              <div className="ns-detail-item">
+                <span className="ns-detail-kicker">SOS Nearby Guardian</span>
+                <span className="ns-detail-val" style={{ color: selectedUser.sosOptIn ? '#5DE0A6' : '#9DADC5' }}>
+                  {selectedUser.sosOptIn ? '● Enabled (~1km Coarse)' : 'Disabled'}
+                </span>
+              </div>
+
+              <div className="ns-detail-item">
+                <span className="ns-detail-kicker">Sobriety Date & Streak</span>
+                <span className="ns-detail-val" style={{ color: '#F5B95D' }}>
+                  {calculateDays(selectedUser.sobrietyDate)} Days ({selectedUser.sobrietyDate || 'N/A'})
+                </span>
+              </div>
+
+              <div className="ns-detail-item">
+                <span className="ns-detail-kicker">Sponsor Status</span>
+                <span className="ns-detail-val">
+                  {selectedUser.sponsorAvailable ? '★ Willing to Sponsor' : 'Not Sponsoring'}
+                </span>
+              </div>
+            </div>
+
+            {/* Moderation Actions */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
+              {selectedUser.banned ? (
+                <button className="ns-btn ns-btn-primary" onClick={() => handleRestoreUser(selectedUser.memberId)}>
+                  <RefreshCw size={14} /> Restore Account
+                </button>
+              ) : (
+                <>
+                  <button className="ns-btn ns-btn-danger" onClick={() => handleSuspendUser(selectedUser.memberId, false)}>
+                    <Ban size={14} /> Suspend Account
+                  </button>
+                  <button className="ns-btn ns-btn-danger" onClick={() => handleSuspendUser(selectedUser.memberId, true)}>
+                    <Ban size={14} /> Ban Hardware Device ID
+                  </button>
+                </>
+              )}
+              <button className="ns-btn ns-btn-secondary" onClick={() => setSelectedUser(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
