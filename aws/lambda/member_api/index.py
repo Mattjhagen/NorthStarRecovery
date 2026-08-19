@@ -451,6 +451,9 @@ def handler(event, context):
             paginator = profiles.meta.client.get_paginator('scan')
             for page in paginator.paginate(TableName=profiles.name):
                 for item in page.get('Items', []):
+                    sos_lat = item.get('sosLat')
+                    sos_lng = item.get('sosLng')
+                    coords = f"{sos_lat}, {sos_lng}" if sos_lat and sos_lng else ''
                     user_list.append({
                         'memberId': item.get('memberId'),
                         'pseudonym': item.get('pseudonym') or 'Anonymous',
@@ -460,9 +463,17 @@ def handler(event, context):
                         'groupPreference': item.get('groupPreference', ''),
                         'xp': int(item.get('xp') or 0),
                         'banned': bool(item.get('banned')),
+                        'deviceType': item.get('deviceType', 'iOS' if item.get('platform') == 'ios' else 'Android' if item.get('platform') == 'android' else 'Mobile App'),
+                        'deviceModel': item.get('deviceModel', ''),
+                        'deviceId': item.get('deviceId', ''),
                         'deviceCount': len(item.get('deviceIds') or []),
                         'hasPushToken': bool(item.get('expoPushToken')),
                         'sponsorAvailable': bool(item.get('sponsorAvailable')),
+                        'sponsorNote': item.get('sponsorNote', ''),
+                        'location': item.get('location') or ('Active Area' if coords else 'Location Private'),
+                        'coordinates': coords,
+                        'sosOptIn': bool(item.get('sosOptIn')),
+                        'appVersion': item.get('appVersion', 'v1.0.1'),
                         'createdAt': item.get('createdAt', '')
                     })
             return reply(200, {'users': user_list, 'total': len(user_list)})

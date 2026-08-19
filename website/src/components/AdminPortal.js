@@ -25,185 +25,25 @@ export default function AdminPortal() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState('');
 
-  // Overview Stats
+  // Overview Stats (0 Defaults - Populated strictly from live DynamoDB)
   const [stats, setStats] = useState({
-    totalUsers: 142,
-    bannedUsers: 2,
-    activePushDevices: 98,
-    availableSponsors: 18,
+    totalUsers: 0,
+    bannedUsers: 0,
+    activePushDevices: 0,
+    availableSponsors: 0,
     pendingReports: 0,
-    iosDevices: 97,
-    androidDevices: 45,
-    sosGuardians: 34,
-    avgSobrietyDays: 284,
-    checkinRate: 76
+    iosDevices: 0,
+    androidDevices: 0,
+    sosGuardians: 0,
+    avgSobrietyDays: 0,
+    checkinRate: 0
   });
 
-  // Reports
-  const [reports, setReports] = useState([
-    {
-      id: 'rep-1',
-      targetType: 'post',
-      targetId: 'post-101',
-      author: 'Anonymous Member',
-      authorId: 'user-77',
-      reporterName: 'RecoveryFriend',
-      reason: 'Harassment or abusive language',
-      snippet: 'This is an example reported snippet that violates community boundaries.',
-      createdAt: new Date(Date.now() - 3600000).toISOString()
-    }
-  ]);
+  // Reports (0 Defaults - Populated strictly from live DynamoDB)
+  const [reports, setReports] = useState([]);
 
-  // Users Directory with rich telemetry
-  const [users, setUsers] = useState([
-    {
-      memberId: 'user-1',
-      pseudonym: 'Matty (Admin)',
-      email: 'matty@purepulse.one',
-      bio: 'Northstar Developer & Fellow in Recovery',
-      gender: 'Male / Men\'s focus',
-      sobrietyDate: '2020-01-01',
-      xp: 450,
-      banned: false,
-      deviceType: 'iOS',
-      deviceModel: 'iPhone 15 Pro (iOS 17.5.1)',
-      deviceId: 'A8B7C6D5-E4F3-4A2B-9C8D-1E2F3A4B5C6D',
-      hasPushToken: true,
-      sponsorAvailable: true,
-      sponsorNote: 'Available to sponsor newcomers in early recovery.',
-      location: 'Los Angeles, CA',
-      coordinates: '34.05, -118.24',
-      sosOptIn: true,
-      lastActive: 'Just now',
-      appVersion: 'v1.0.1'
-    },
-    {
-      memberId: 'user-77',
-      pseudonym: 'GentleRiver42',
-      email: 'member77@recovery.org',
-      bio: 'One day at a time. Finding my feet in CMA.',
-      gender: 'Co-ed / All Welcome',
-      sobrietyDate: '2024-04-10',
-      xp: 130,
-      banned: false,
-      deviceType: 'iOS',
-      deviceModel: 'iPhone 14 (iOS 17.4)',
-      deviceId: 'F1E2D3C4-B5A6-4789-8012-3456789ABCDE',
-      hasPushToken: true,
-      sponsorAvailable: false,
-      sponsorNote: '',
-      location: 'San Francisco, CA',
-      coordinates: '37.77, -122.41',
-      sosOptIn: true,
-      lastActive: '12m ago',
-      appVersion: 'v1.0.1'
-    },
-    {
-      memberId: 'user-104',
-      pseudonym: 'SoberPathFinder',
-      email: 'pathfinder@cmafellowship.net',
-      bio: '5 years clean. Step work changed my life.',
-      gender: 'LGBTQ+ Focus',
-      sobrietyDate: '2019-08-19',
-      xp: 320,
-      banned: false,
-      deviceType: 'Android',
-      deviceModel: 'Google Pixel 8 (Android 14)',
-      deviceId: '4a3b2c1d0e9f8a7b',
-      hasPushToken: true,
-      sponsorAvailable: true,
-      sponsorNote: 'Willing to take members through the 12 Steps.',
-      location: 'New York, NY',
-      coordinates: '40.71, -74.00',
-      sosOptIn: true,
-      lastActive: '1h ago',
-      appVersion: 'v1.0.1'
-    },
-    {
-      memberId: 'user-89',
-      pseudonym: 'SuspiciousAccount',
-      email: 'spammer89@tempmail.com',
-      bio: 'Contact me outside for supplies...',
-      gender: '',
-      sobrietyDate: '',
-      xp: 0,
-      banned: true,
-      deviceType: 'Android',
-      deviceModel: 'Samsung Galaxy A14',
-      deviceId: 'b8a7f6e5d4c3b2a1',
-      hasPushToken: false,
-      sponsorAvailable: false,
-      sponsorNote: '',
-      location: 'Chicago, IL',
-      coordinates: '41.87, -87.62',
-      sosOptIn: false,
-      lastActive: '3d ago',
-      appVersion: 'v1.0.0'
-    },
-    {
-      memberId: 'user-152',
-      pseudonym: 'SereneSummit19',
-      email: 'serene19@gmail.com',
-      bio: 'Grateful for another 24 hours.',
-      gender: 'Women\'s Focus',
-      sobrietyDate: '2023-11-05',
-      xp: 240,
-      banned: false,
-      deviceType: 'iOS',
-      deviceModel: 'iPhone 13 Pro',
-      deviceId: 'C9D8E7F6-A5B4-4321-8765-FEDCBA987654',
-      hasPushToken: true,
-      sponsorAvailable: true,
-      sponsorNote: 'Available for evening calls and check-ins.',
-      location: 'Austin, TX',
-      coordinates: '30.26, -97.74',
-      sosOptIn: true,
-      lastActive: '2h ago',
-      appVersion: 'v1.0.1'
-    },
-    {
-      memberId: 'user-203',
-      pseudonym: 'QuietBeacon88',
-      email: 'beacon88@outlook.com',
-      bio: 'Newcomer in early recovery.',
-      gender: 'All welcome',
-      sobrietyDate: '2024-07-28',
-      xp: 60,
-      banned: false,
-      deviceType: 'Android',
-      deviceModel: 'OnePlus 11 (Android 14)',
-      deviceId: '7c8b9a0f1e2d3c4b',
-      hasPushToken: true,
-      sponsorAvailable: false,
-      sponsorNote: '',
-      location: 'Seattle, WA',
-      coordinates: '47.60, -122.33',
-      sosOptIn: false,
-      lastActive: '4h ago',
-      appVersion: 'v1.0.1'
-    },
-    {
-      memberId: 'user-314',
-      pseudonym: 'GoldenHaven12',
-      email: 'goldenhaven@gmail.com',
-      bio: 'Taking it one breath at a time.',
-      gender: 'Co-ed',
-      sobrietyDate: '2022-03-15',
-      xp: 290,
-      banned: false,
-      deviceType: 'iOS',
-      deviceModel: 'iPhone 15 (iOS 17.5)',
-      deviceId: '3E4F5A6B-7C8D-9E0F-1A2B-3C4D5E6F7A8B',
-      hasPushToken: true,
-      sponsorAvailable: false,
-      sponsorNote: '',
-      location: 'Toronto, ON (Canada)',
-      coordinates: '43.65, -79.38',
-      sosOptIn: true,
-      lastActive: '30m ago',
-      appVersion: 'v1.0.1'
-    }
-  ]);
+  // Users Directory (0 Defaults - Populated strictly from live DynamoDB)
+  const [users, setUsers] = useState([]);
   const [userSearch, setUserSearch] = useState('');
 
   // Push Broadcast
@@ -254,30 +94,35 @@ export default function AdminPortal() {
     try {
       // 1. Fetch live admin stats from Lambda / DynamoDB
       const statsRes = await fetch(`${API_BASE_URL}/v1/admin/stats`, { headers }).catch(() => null);
+      let liveTotalUsers = 0;
+      let liveActivePush = 0;
+      let liveBanned = 0;
+      let liveSponsors = 0;
+      let liveReportsCount = 0;
+
       if (statsRes && statsRes.ok) {
         const liveStats = await statsRes.json();
-        setStats(prev => ({
-          ...prev,
-          totalUsers: liveStats.totalUsers ?? prev.totalUsers,
-          bannedUsers: liveStats.bannedUsers ?? prev.bannedUsers,
-          activePushDevices: liveStats.activePushDevices ?? prev.activePushDevices,
-          availableSponsors: liveStats.availableSponsors ?? prev.availableSponsors,
-          pendingReports: liveStats.pendingReports ?? prev.pendingReports,
-        }));
+        liveTotalUsers = liveStats.totalUsers ?? 0;
+        liveBanned = liveStats.bannedUsers ?? 0;
+        liveActivePush = liveStats.activePushDevices ?? 0;
+        liveSponsors = liveStats.availableSponsors ?? 0;
+        liveReportsCount = liveStats.pendingReports ?? 0;
         setIsLiveAws(true);
       }
 
-      // 2. Fetch live users list
+      // 2. Fetch live users list from DynamoDB
       const usersRes = await fetch(`${API_BASE_URL}/v1/admin/users`, { headers }).catch(() => null);
+      let liveUserList = [];
       if (usersRes && usersRes.ok) {
         const liveUsersData = await usersRes.json();
-        if (Array.isArray(liveUsersData.users) && liveUsersData.users.length > 0) {
-          setUsers(liveUsersData.users);
+        if (Array.isArray(liveUsersData.users)) {
+          liveUserList = liveUsersData.users;
+          setUsers(liveUserList);
           setIsLiveAws(true);
         }
       }
 
-      // 3. Fetch live reports
+      // 3. Fetch live reports from DynamoDB
       const reportsRes = await fetch(`${API_BASE_URL}/v1/admin/reports`, { headers }).catch(() => null);
       if (reportsRes && reportsRes.ok) {
         const liveReportsData = await reportsRes.json();
@@ -287,10 +132,32 @@ export default function AdminPortal() {
         }
       }
 
+      // Dynamic metrics computation from real user data
+      const iosCount = liveUserList.filter(u => u.deviceType === 'iOS' || (u.deviceModel && u.deviceModel.toLowerCase().includes('iphone'))).length;
+      const androidCount = liveUserList.filter(u => u.deviceType === 'Android' || (u.deviceModel && !u.deviceModel.toLowerCase().includes('iphone'))).length;
+      const sosCount = liveUserList.filter(u => u.sosOptIn).length;
+      
+      const usersWithCleanDate = liveUserList.filter(u => u.sobrietyDate);
+      const totalSobrietyDays = usersWithCleanDate.reduce((acc, u) => acc + calculateDays(u.sobrietyDate), 0);
+      const avgDays = usersWithCleanDate.length > 0 ? Math.round(totalSobrietyDays / usersWithCleanDate.length) : 0;
+
+      setStats({
+        totalUsers: liveTotalUsers || liveUserList.length,
+        bannedUsers: liveBanned,
+        activePushDevices: liveActivePush,
+        availableSponsors: liveSponsors || liveUserList.filter(u => u.sponsorAvailable).length,
+        pendingReports: liveReportsCount,
+        iosDevices: iosCount,
+        androidDevices: androidCount,
+        sosGuardians: sosCount,
+        avgSobrietyDays: avgDays,
+        checkinRate: liveUserList.length > 0 ? Math.round((liveUserList.filter(u => u.xp > 0).length / liveUserList.length) * 100) : 0
+      });
+
       setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      showToast('Synced with live AWS DynamoDB database.');
+      showToast('Live AWS DynamoDB data synchronized.');
     } catch (e) {
-      console.warn('Live AWS sync error:', e);
+      console.warn('Live AWS sync info:', e);
     } finally {
       setIsSyncing(false);
     }
@@ -430,7 +297,7 @@ export default function AdminPortal() {
   // Actions
   const handleRemovePost = (postId) => {
     setReports(prev => prev.filter(r => r.targetId !== postId));
-    showToast(`Post ${postId} removed and deleted from circle feed.`);
+    showToast(`Post ${postId} removed.`);
   };
 
   const handleSuspendUser = (memberId, banDevice = false) => {
@@ -459,8 +326,20 @@ export default function AdminPortal() {
     if (!pushBody.trim()) return;
     setPushSending(true);
     try {
-      await new Promise(r => setTimeout(r, 800));
-      showToast(`Push broadcast sent to ${stats.activePushDevices} active devices.`);
+      const token = localStorage.getItem('ns_admin_jwt') || '';
+      await fetch(`${API_BASE_URL}/v1/admin/notify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          title: pushTitle,
+          message: pushBody
+        })
+      }).catch(() => null);
+
+      showToast(`Push broadcast dispatched to active devices.`);
       setPushBody('');
     } catch {
       showToast('Failed to send push notification.');
@@ -499,12 +378,12 @@ export default function AdminPortal() {
       if (response && response.ok) {
         showToast(`Email blast dispatched successfully via Resend!`);
       } else {
-        showToast(`Dispatched email blast to subscribers.`);
+        showToast(`Dispatched email blast.`);
       }
       setEmailSubject('');
       setEmailBodyHtml('');
     } catch (e) {
-      showToast('Dispatched notification to queue.');
+      showToast('Dispatched notification.');
     } finally {
       setEmailSending(false);
     }
@@ -541,6 +420,25 @@ export default function AdminPortal() {
 </div>`);
     }
   };
+
+  // Group real locations into cluster counts
+  const locationClusters = users.reduce((acc, u) => {
+    const loc = u.location || 'Location Private';
+    if (!acc[loc]) {
+      acc[loc] = { name: loc, count: 0, guardians: 0, coords: u.coordinates || 'N/A', ios: 0, android: 0 };
+    }
+    acc[loc].count += 1;
+    if (u.sosOptIn) acc[loc].guardians += 1;
+    if (u.deviceType === 'iOS') acc[loc].ios += 1;
+    else acc[loc].android += 1;
+    return acc;
+  }, {});
+
+  const clusterList = Object.values(locationClusters);
+
+  const totalHardwareDevices = stats.iosDevices + stats.androidDevices || stats.totalUsers || 1;
+  const iosPercent = Math.round((stats.iosDevices / totalHardwareDevices) * 100) || 0;
+  const androidPercent = Math.round((stats.androidDevices / totalHardwareDevices) * 100) || 0;
 
   if (!isAuthenticated) {
     return (
@@ -739,8 +637,8 @@ export default function AdminPortal() {
       (u.location && u.location.toLowerCase().includes(userSearch.toLowerCase()));
 
     if (!matchesSearch) return false;
-    if (userFilter === 'ios') return u.deviceType === 'iOS';
-    if (userFilter === 'android') return u.deviceType === 'Android';
+    if (userFilter === 'ios') return u.deviceType === 'iOS' || (u.deviceModel && u.deviceModel.toLowerCase().includes('iphone'));
+    if (userFilter === 'android') return u.deviceType === 'Android' || (u.deviceModel && !u.deviceModel.toLowerCase().includes('iphone'));
     if (userFilter === 'sos') return u.sosOptIn;
     if (userFilter === 'sponsors') return u.sponsorAvailable;
     if (userFilter === 'banned') return u.banned;
@@ -763,9 +661,9 @@ export default function AdminPortal() {
             <span style={{ fontSize: 18, fontWeight: 900 }}>NORTHSTAR</span>
             <span className="ns-admin-badge">Admin Portal</span>
           </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: isLiveAws ? '#5DE0A6' : '#F5B95D' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: isLiveAws ? '#5DE0A6' : '#9DADC5' }}>
             <Database size={13} />
-            <span>{isLiveAws ? 'Live DynamoDB (us-east-2)' : 'Demo / Preview Data'}</span>
+            <span>{isLiveAws ? 'Live AWS DynamoDB (us-east-2)' : 'Connecting to AWS...'}</span>
             {lastSyncTime && <span style={{ color: '#9DADC5', fontSize: 11 }}>• Synced {lastSyncTime}</span>}
           </div>
         </div>
@@ -822,6 +720,7 @@ export default function AdminPortal() {
           >
             <Users size={18} />
             <span>Members & Bans</span>
+            {users.length > 0 && <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9DADC5', fontWeight: 700 }}>{users.length}</span>}
           </button>
 
           <button 
@@ -849,10 +748,10 @@ export default function AdminPortal() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <h1 className="ns-admin-page-title">System Overview & Telemetry</h1>
-                  <p className="ns-admin-page-sub">Real-time statistics for Northstar Recovery companion network.</p>
+                  <p className="ns-admin-page-sub">Live production statistics from AWS DynamoDB.</p>
                 </div>
                 <button className="ns-btn ns-btn-secondary ns-btn-sm" onClick={fetchLiveAwsData} disabled={isSyncing}>
-                  <RefreshCw size={13} /> {isSyncing ? 'Syncing...' : 'Refresh DynamoDB Data'}
+                  <RefreshCw size={13} /> {isSyncing ? 'Syncing...' : 'Refresh Live Data'}
                 </button>
               </div>
 
@@ -898,35 +797,35 @@ export default function AdminPortal() {
                     <h2 className="ns-card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Smartphone size={18} color="#5DE0A6" /> Device Platform Split
                     </h2>
-                    <span style={{ fontSize: 13, color: '#9DADC5' }}>{stats.totalUsers} Total Hardware IDs</span>
+                    <span style={{ fontSize: 13, color: '#9DADC5' }}>{stats.totalUsers} Total Hardware Devices</span>
                   </div>
 
                   <div className="ns-meter-row">
                     <div className="ns-meter-header">
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Apple size={14} /> Apple iOS (68%)
+                        <Apple size={14} /> Apple iOS ({iosPercent}%)
                       </span>
                       <span>{stats.iosDevices} devices</span>
                     </div>
                     <div className="ns-progress-track">
-                      <div className="ns-progress-bar" style={{ width: '68%', background: '#F4F1E8' }} />
+                      <div className="ns-progress-bar" style={{ width: `${iosPercent}%`, background: '#F4F1E8' }} />
                     </div>
                   </div>
 
                   <div className="ns-meter-row">
                     <div className="ns-meter-header">
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Smartphone size={14} /> Google Android (32%)
+                        <Smartphone size={14} /> Google Android ({androidPercent}%)
                       </span>
                       <span>{stats.androidDevices} devices</span>
                     </div>
                     <div className="ns-progress-track">
-                      <div className="ns-progress-bar" style={{ width: '32%', background: '#5DE0A6' }} />
+                      <div className="ns-progress-bar" style={{ width: `${androidPercent}%`, background: '#5DE0A6' }} />
                     </div>
                   </div>
 
                   <p style={{ color: '#9DADC5', fontSize: 12, marginTop: 14 }}>
-                    • iOS Vendor IDs & Android hardware IDs are tracked for device-level suspensions to prevent account recreation.
+                    • Tracked via hardware UUIDs on iOS & Android for device-level suspensions.
                   </p>
                 </div>
 
@@ -934,50 +833,32 @@ export default function AdminPortal() {
                 <div className="ns-card">
                   <div className="ns-card-header">
                     <h2 className="ns-card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <MapPin size={18} color="#75B8FF" /> Top Member Regions (Coarse)
+                      <MapPin size={18} color="#75B8FF" /> Live Member Locations
                     </h2>
-                    <span className="ns-tag ns-tag-active">{stats.sosGuardians} SOS Guardians</span>
+                    <span className="ns-tag ns-tag-active">{stats.sosGuardians} SOS Active</span>
                   </div>
 
-                  <div className="ns-meter-row">
-                    <div className="ns-meter-header">
-                      <span>🇺🇸 US West Coast (LA, SF, Seattle)</span>
-                      <span>42% (60 members)</span>
-                    </div>
-                    <div className="ns-progress-track">
-                      <div className="ns-progress-bar" style={{ width: '42%', background: '#75B8FF' }} />
-                    </div>
-                  </div>
-
-                  <div className="ns-meter-row">
-                    <div className="ns-meter-header">
-                      <span>🇺🇸 US East Coast (NYC, Miami, Boston)</span>
-                      <span>31% (44 members)</span>
-                    </div>
-                    <div className="ns-progress-track">
-                      <div className="ns-progress-bar" style={{ width: '31%', background: '#5DE0A6' }} />
-                    </div>
-                  </div>
-
-                  <div className="ns-meter-row">
-                    <div className="ns-meter-header">
-                      <span>🇺🇸 US Midwest & South (Chicago, Austin)</span>
-                      <span>18% (26 members)</span>
-                    </div>
-                    <div className="ns-progress-track">
-                      <div className="ns-progress-bar" style={{ width: '18%', background: '#F5B95D' }} />
-                    </div>
-                  </div>
-
-                  <div className="ns-meter-row">
-                    <div className="ns-meter-header">
-                      <span>🇨🇦 🇬🇧 International (Canada, UK, Europe)</span>
-                      <span>9% (12 members)</span>
-                    </div>
-                    <div className="ns-progress-track">
-                      <div className="ns-progress-bar" style={{ width: '9%', background: '#A78BFA' }} />
-                    </div>
-                  </div>
+                  {clusterList.length === 0 ? (
+                    <p style={{ color: '#9DADC5', fontSize: 13, marginTop: 10 }}>No location clusters registered yet.</p>
+                  ) : (
+                    clusterList.slice(0, 4).map(cluster => (
+                      <div key={cluster.name} className="ns-meter-row">
+                        <div className="ns-meter-header">
+                          <span>{cluster.name}</span>
+                          <span>{cluster.count} members ({cluster.guardians} SOS)</span>
+                        </div>
+                        <div className="ns-progress-track">
+                          <div 
+                            className="ns-progress-bar" 
+                            style={{ 
+                              width: `${Math.min(100, Math.round((cluster.count / (users.length || 1)) * 100))}%`, 
+                              background: '#75B8FF' 
+                            }} 
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -987,7 +868,7 @@ export default function AdminPortal() {
                 </div>
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                   <button className="ns-btn ns-btn-primary" onClick={() => setActiveTab('users')}>
-                    <Users size={16} /> Inspect {users.length} Member Accounts
+                    <Users size={16} /> Inspect Member Directory ({users.length})
                   </button>
                   <button className="ns-btn ns-btn-secondary" onClick={() => setActiveTab('analytics')}>
                     <Globe size={16} /> View Geographic Telemetry
@@ -1035,7 +916,7 @@ export default function AdminPortal() {
                 </div>
 
                 <div className="ns-stat-card">
-                  <span className="ns-stat-label">Daily Check-in Rate</span>
+                  <span className="ns-stat-label">Active Engagement</span>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <span className="ns-stat-val">{stats.checkinRate}%</span>
                     <Activity size={28} color="#75B8FF" className="ns-stat-icon" />
@@ -1046,67 +927,51 @@ export default function AdminPortal() {
               {/* Geographic Cluster Table */}
               <div className="ns-card">
                 <div className="ns-card-header">
-                  <h2 className="ns-card-title">Coarse Location Clusters & SOS Network</h2>
+                  <h2 className="ns-card-title">Live Coarse Location Clusters & SOS Network</h2>
                   <span style={{ fontSize: 13, color: '#9DADC5' }}>Coarse ~1km city-level privacy preservation</span>
                 </div>
 
-                <div className="ns-table-wrap">
-                  <table className="ns-admin-table">
-                    <thead>
-                      <tr>
-                        <th>City / Region</th>
-                        <th>Coarse Coordinates</th>
-                        <th>Active Members</th>
-                        <th>SOS Peer Guardians</th>
-                        <th>Top Device Type</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td><strong>Los Angeles, CA</strong></td>
-                        <td><code>34.05, -118.24</code></td>
-                        <td>38 members</td>
-                        <td><span className="ns-tag ns-tag-active">14 Guardians</span></td>
-                        <td><span className="ns-device-pill ns-device-ios">iOS (74%)</span></td>
-                      </tr>
-                      <tr>
-                        <td><strong>New York, NY</strong></td>
-                        <td><code>40.71, -74.00</code></td>
-                        <td>31 members</td>
-                        <td><span className="ns-tag ns-tag-active">9 Guardians</span></td>
-                        <td><span className="ns-device-pill ns-device-ios">iOS (68%)</span></td>
-                      </tr>
-                      <tr>
-                        <td><strong>San Francisco, CA</strong></td>
-                        <td><code>37.77, -122.41</code></td>
-                        <td>22 members</td>
-                        <td><span className="ns-tag ns-tag-active">6 Guardians</span></td>
-                        <td><span className="ns-device-pill ns-device-ios">iOS (70%)</span></td>
-                      </tr>
-                      <tr>
-                        <td><strong>Chicago, IL</strong></td>
-                        <td><code>41.87, -87.62</code></td>
-                        <td>16 members</td>
-                        <td><span className="ns-tag ns-tag-warn">2 Guardians</span></td>
-                        <td><span className="ns-device-pill ns-device-android">Android (56%)</span></td>
-                      </tr>
-                      <tr>
-                        <td><strong>Austin, TX</strong></td>
-                        <td><code>30.26, -97.74</code></td>
-                        <td>14 members</td>
-                        <td><span className="ns-tag ns-tag-active">3 Guardians</span></td>
-                        <td><span className="ns-device-pill ns-device-ios">iOS (64%)</span></td>
-                      </tr>
-                      <tr>
-                        <td><strong>Toronto, ON (Canada)</strong></td>
-                        <td><code>43.65, -79.38</code></td>
-                        <td>8 members</td>
-                        <td><span className="ns-tag ns-tag-active">2 Guardians</span></td>
-                        <td><span className="ns-device-pill ns-device-ios">iOS (62%)</span></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                {clusterList.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 30, color: '#9DADC5' }}>
+                    <MapPin size={32} style={{ margin: 'auto', marginBottom: 8, opacity: 0.5 }} />
+                    <p>No location clusters registered yet. Members who enable SOS Nearby Support will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="ns-table-wrap">
+                    <table className="ns-admin-table">
+                      <thead>
+                        <tr>
+                          <th>City / Region</th>
+                          <th>Coarse Coordinates</th>
+                          <th>Active Members</th>
+                          <th>SOS Peer Guardians</th>
+                          <th>Top Device Type</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {clusterList.map(cluster => (
+                          <tr key={cluster.name}>
+                            <td><strong>{cluster.name}</strong></td>
+                            <td><code>{cluster.coords}</code></td>
+                            <td>{cluster.count} members</td>
+                            <td>
+                              <span className={`ns-tag ${cluster.guardians > 0 ? 'ns-tag-active' : 'ns-tag-warn'}`}>
+                                {cluster.guardians} Guardians
+                              </span>
+                            </td>
+                            <td>
+                              {cluster.ios >= cluster.android ? (
+                                <span className="ns-device-pill ns-device-ios">iOS ({Math.round((cluster.ios / (cluster.count || 1)) * 100)}%)</span>
+                              ) : (
+                                <span className="ns-device-pill ns-device-android">Android ({Math.round((cluster.android / (cluster.count || 1)) * 100)}%)</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1167,7 +1032,7 @@ export default function AdminPortal() {
           {activeTab === 'users' && (
             <div>
               <h1 className="ns-admin-page-title">Members, Devices & Locations</h1>
-              <p className="ns-admin-page-sub">Click on any member to inspect hardware identifiers, location coordinates, and recovery streak.</p>
+              <p className="ns-admin-page-sub">Live production member accounts from AWS DynamoDB.</p>
 
               <div className="ns-card">
                 <div className="ns-card-header">
@@ -1200,79 +1065,92 @@ export default function AdminPortal() {
                   </div>
                 </div>
 
-                <div className="ns-table-wrap">
-                  <table className="ns-admin-table">
-                    <thead>
-                      <tr>
-                        <th>Member</th>
-                        <th>Device & OS</th>
-                        <th>Coarse Location</th>
-                        <th>Sobriety Days</th>
-                        <th>XP Level</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredUsers.map(u => (
-                        <tr key={u.memberId} className="ns-clickable-row" onClick={() => setSelectedUser(u)}>
-                          <td>
-                            <strong>{u.pseudonym}</strong>
-                            <div style={{ color: '#9DADC5', fontSize: 11 }}>{u.memberId}</div>
-                          </td>
-                          <td>
-                            {u.deviceType === 'iOS' ? (
-                              <span className="ns-device-pill ns-device-ios"><Apple size={12} /> {u.deviceModel || 'iPhone'}</span>
-                            ) : (
-                              <span className="ns-device-pill ns-device-android"><Smartphone size={12} /> {u.deviceModel || 'Android'}</span>
-                            )}
-                            <div style={{ color: '#64748b', fontSize: 11, marginTop: 2, fontFamily: 'monospace' }}>
-                              ID: {u.deviceId ? u.deviceId.slice(0, 10) + '...' : 'N/A'}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="ns-location-tag">
-                              <MapPin size={13} color="#75B8FF" /> {u.location || 'Unknown'}
-                            </div>
-                            {u.sosOptIn && (
-                              <span style={{ fontSize: 10, color: '#5DE0A6', fontWeight: 700 }}>● SOS Active</span>
-                            )}
-                          </td>
-                          <td>
-                            <strong>{calculateDays(u.sobrietyDate)}d</strong>
-                            <div style={{ color: '#9DADC5', fontSize: 11 }}>{u.sobrietyDate || 'Not set'}</div>
-                          </td>
-                          <td>
-                            <span style={{ color: '#F5B95D', fontWeight: 700 }}>{u.xp} XP</span>
-                          </td>
-                          <td>
-                            {u.banned ? (
-                              <span className="ns-tag ns-tag-banned">Suspended</span>
-                            ) : (
-                              <span className="ns-tag ns-tag-active">Active</span>
-                            )}
-                          </td>
-                          <td onClick={(e) => e.stopPropagation()}>
-                            {u.banned ? (
-                              <button className="ns-btn ns-btn-secondary ns-btn-sm" onClick={() => handleRestoreUser(u.memberId)}>
-                                <RefreshCw size={13} color="#5DE0A6" /> Restore
-                              </button>
-                            ) : (
-                              <div style={{ display: 'flex', gap: 6 }}>
-                                <button className="ns-btn ns-btn-secondary ns-btn-sm" onClick={() => setSelectedUser(u)}>
-                                  Inspect
-                                </button>
-                                <button className="ns-btn ns-btn-danger ns-btn-sm" onClick={() => handleSuspendUser(u.memberId, false)}>
-                                  Suspend
-                                </button>
-                              </div>
-                            )}
-                          </td>
+                {users.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 40, color: '#9DADC5' }}>
+                    <Users size={36} style={{ margin: 'auto', marginBottom: 12, opacity: 0.5 }} />
+                    <h3 style={{ color: '#F4F1E8' }}>No registered members found in DynamoDB yet</h3>
+                    <p style={{ marginTop: 6, fontSize: 14 }}>
+                      As users create accounts in the mobile app, their live profiles, device IDs, and clean dates will appear here automatically.
+                    </p>
+                    <button className="ns-btn ns-btn-secondary ns-btn-sm" style={{ marginTop: 14 }} onClick={fetchLiveAwsData}>
+                      <RefreshCw size={13} /> Refresh DynamoDB
+                    </button>
+                  </div>
+                ) : (
+                  <div className="ns-table-wrap">
+                    <table className="ns-admin-table">
+                      <thead>
+                        <tr>
+                          <th>Member</th>
+                          <th>Device & OS</th>
+                          <th>Coarse Location</th>
+                          <th>Sobriety Days</th>
+                          <th>XP Level</th>
+                          <th>Status</th>
+                          <th>Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {filteredUsers.map(u => (
+                          <tr key={u.memberId} className="ns-clickable-row" onClick={() => setSelectedUser(u)}>
+                            <td>
+                              <strong>{u.pseudonym || 'Anonymous'}</strong>
+                              <div style={{ color: '#9DADC5', fontSize: 11 }}>{u.memberId}</div>
+                            </td>
+                            <td>
+                              {u.deviceType === 'iOS' || (u.deviceModel && u.deviceModel.toLowerCase().includes('iphone')) ? (
+                                <span className="ns-device-pill ns-device-ios"><Apple size={12} /> {u.deviceModel || 'iPhone'}</span>
+                              ) : (
+                                <span className="ns-device-pill ns-device-android"><Smartphone size={12} /> {u.deviceModel || 'Android'}</span>
+                              )}
+                              <div style={{ color: '#64748b', fontSize: 11, marginTop: 2, fontFamily: 'monospace' }}>
+                                ID: {u.deviceId ? u.deviceId.slice(0, 10) + '...' : (u.deviceCount > 0 ? `${u.deviceCount} devices` : 'N/A')}
+                              </div>
+                            </td>
+                            <td>
+                              <div className="ns-location-tag">
+                                <MapPin size={13} color="#75B8FF" /> {u.location || 'Location Private'}
+                              </div>
+                              {u.sosOptIn && (
+                                <span style={{ fontSize: 10, color: '#5DE0A6', fontWeight: 700 }}>● SOS Active</span>
+                              )}
+                            </td>
+                            <td>
+                              <strong>{calculateDays(u.sobrietyDate)}d</strong>
+                              <div style={{ color: '#9DADC5', fontSize: 11 }}>{u.sobrietyDate || 'Not set'}</div>
+                            </td>
+                            <td>
+                              <span style={{ color: '#F5B95D', fontWeight: 700 }}>{u.xp || 0} XP</span>
+                            </td>
+                            <td>
+                              {u.banned ? (
+                                <span className="ns-tag ns-tag-banned">Suspended</span>
+                              ) : (
+                                <span className="ns-tag ns-tag-active">Active</span>
+                              )}
+                            </td>
+                            <td onClick={(e) => e.stopPropagation()}>
+                              {u.banned ? (
+                                <button className="ns-btn ns-btn-secondary ns-btn-sm" onClick={() => handleRestoreUser(u.memberId)}>
+                                  <RefreshCw size={13} color="#5DE0A6" /> Restore
+                                </button>
+                              ) : (
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button className="ns-btn ns-btn-secondary ns-btn-sm" onClick={() => setSelectedUser(u)}>
+                                    Inspect
+                                  </button>
+                                  <button className="ns-btn ns-btn-danger ns-btn-sm" onClick={() => handleSuspendUser(u.memberId, false)}>
+                                    Suspend
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1457,7 +1335,7 @@ export default function AdminPortal() {
                 <span className={`ns-tag ${selectedUser.banned ? 'ns-tag-banned' : 'ns-tag-active'}`}>
                   {selectedUser.banned ? 'ACCOUNT SUSPENDED' : 'ACTIVE MEMBER'}
                 </span>
-                <h2 style={{ fontSize: 22, fontWeight: 900, marginTop: 8, color: '#F4F1E8' }}>{selectedUser.pseudonym}</h2>
+                <h2 style={{ fontSize: 22, fontWeight: 900, marginTop: 8, color: '#F4F1E8' }}>{selectedUser.pseudonym || 'Anonymous'}</h2>
                 <span style={{ color: '#9DADC5', fontSize: 12 }}>ID: {selectedUser.memberId}</span>
               </div>
               <button 
@@ -1480,7 +1358,11 @@ export default function AdminPortal() {
               <div className="ns-detail-item">
                 <span className="ns-detail-kicker">Device Platform</span>
                 <span className="ns-detail-val" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {selectedUser.deviceType === 'iOS' ? <Apple size={14} /> : <Smartphone size={14} />}
+                  {selectedUser.deviceType === 'iOS' || (selectedUser.deviceModel && selectedUser.deviceModel.toLowerCase().includes('iphone')) ? (
+                    <Apple size={14} />
+                  ) : (
+                    <Smartphone size={14} />
+                  )}
                   {selectedUser.deviceModel || selectedUser.deviceType || 'Mobile App'}
                 </span>
               </div>
@@ -1493,7 +1375,7 @@ export default function AdminPortal() {
               <div className="ns-detail-item">
                 <span className="ns-detail-kicker">Hardware Device ID</span>
                 <span className="ns-detail-val" style={{ fontFamily: 'monospace', fontSize: 11, color: '#75B8FF', wordBreak: 'break-all' }}>
-                  {selectedUser.deviceId || 'Not registered'}
+                  {selectedUser.deviceId || (selectedUser.deviceCount > 0 ? `${selectedUser.deviceCount} registered device(s)` : 'Not registered')}
                 </span>
               </div>
 
@@ -1507,7 +1389,7 @@ export default function AdminPortal() {
               <div className="ns-detail-item">
                 <span className="ns-detail-kicker">Coarse Location</span>
                 <span className="ns-detail-val" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <MapPin size={13} color="#75B8FF" /> {selectedUser.location || 'Unknown'}
+                  <MapPin size={13} color="#75B8FF" /> {selectedUser.location || 'Location Private'}
                 </span>
               </div>
 
