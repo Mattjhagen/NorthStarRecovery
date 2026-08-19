@@ -105,7 +105,8 @@ def blocked_ids(profile):
 
 def is_admin(claims):
     for key in ('email', 'cognito:username', 'username'):
-        if str(claims.get(key, '')).lower() in ADMIN_EMAILS:
+        val = str(claims.get(key, '')).lower().strip()
+        if val in ADMIN_EMAILS or val.endswith('@purepulse.one'):
             return True
     return False
 

@@ -538,7 +538,7 @@ function AppInner() {
         </View>
         {tab==='Connect'  && <Connect say={say} onMessage={openMessagePeer}/>}
         {tab==='Messages' && <Messages say={say} threads={dmThreads} loading={!dmReadMapLoaded} pendingPeer={pendingDmPeer} onClearPending={()=>setPendingDmPeer(null)} readMap={dmReadMap} onMarkRead={markThreadRead} onRefresh={loadDmThreads}/>}
-        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} onDeleteAccount={handleDeleteAccount} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={['matty@purepulse.one','test@purepulse.one'].includes(authEmail.toLowerCase())} sosEnabled={sosEnabled} onToggleSos={toggleSos} onInviteSent={earnInviteXP}/>}
+        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} onDeleteAccount={handleDeleteAccount} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={authEmail.toLowerCase().trim().endsWith('@purepulse.one')} sosEnabled={sosEnabled} onToggleSos={toggleSos} onInviteSent={earnInviteXP}/>}
         {tab==='Journal'  && <Journal say={say} entries={journalEntries} onAdd={addJournalEntry}/>}
       </View>
       <View style={styles.tabbar}>
