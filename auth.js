@@ -1,7 +1,7 @@
 import 'react-native-get-random-values';
 import { Amplify } from 'aws-amplify';
-import { confirmSignUp, fetchAuthSession, getCurrentUser, signIn, signOut, signUp } from 'aws-amplify/auth';
-import { clearAccessToken, saveAccessToken } from './backend';
+import { confirmSignUp, deleteUser, fetchAuthSession, getCurrentUser, signIn, signOut, signUp } from 'aws-amplify/auth';
+import { apiRequest, clearAccessToken, isBackendConfigured, saveAccessToken } from './backend';
 
 const userPoolId = process.env.EXPO_PUBLIC_COGNITO_USER_POOL_ID;
 const userPoolClientId = process.env.EXPO_PUBLIC_COGNITO_APP_CLIENT_ID;
@@ -67,4 +67,21 @@ export async function restoreSignedInUser() {
 export async function signOutEverywhere() {
   await signOut({ global: true });
   await clearAccessToken();
+}
+
+export async function deleteAccount() {
+  if (isBackendConfigured()) {
+    try {
+      await apiRequest('/v1/me', { method: 'DELETE' });
+    } catch {
+      try {
+        await deleteUser();
+      } catch {}
+    }
+  } else {
+    try {
+      await deleteUser();
+    } catch {}
+  }
+  await signOutEverywhere().catch(() => {});
 }

@@ -72,7 +72,9 @@
           "audio"
         ],
         "NSPhotoLibraryUsageDescription": "Northstar Recovery uses your photo library so you can set an optional profile photo.",
-        "NSLocationWhenInUseUsageDescription": "Northstar uses your location to sort meetings by distance and, if you opt in, to send and receive nearby SOS support alerts. Only a coarse, city-level location is ever stored."
+        "NSLocationWhenInUseUsageDescription": "Northstar Recovery uses your location to sort meetings by distance and, if you opt in, to send and receive nearby SOS peer support alerts. Only a coarse, city-level location is ever stored.",
+        "NSContactsUsageDescription": "Northstar Recovery accesses your contacts only when you choose to text an invitation to friends. Your contacts remain on your device and are never uploaded or shared.",
+        "NSMicrophoneUsageDescription": "Northstar Recovery uses your microphone when you choose to join an interactive recovery meeting with audio."
       },
       "icon": {
         "light": "./assets/northstar-app-icon.png",

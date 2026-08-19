@@ -18,7 +18,7 @@ export default function PublicSite() {
     <div className="ns-sky" aria-hidden="true"><span className="ns-star ns-star-a" /><span className="ns-star ns-star-b" /><span className="ns-star ns-star-c" /><span className="ns-grid" /></div>
     <header className="ns-header">
       <Wordmark />
-      <nav aria-label="Main navigation"><Link to="/privacy">Privacy</Link><AppLink className="ns-open-app">Open the app <ArrowUpRight size={15} aria-hidden="true" /></AppLink></nav>
+      <nav aria-label="Main navigation"><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><AppLink className="ns-open-app">Open the app <ArrowUpRight size={15} aria-hidden="true" /></AppLink></nav>
     </header>
 
     <section className="ns-hero" aria-labelledby="hero-title">
@@ -43,6 +43,6 @@ export default function PublicSite() {
       <div className="ns-boundary-copy"><p>Northstar is designed to be anonymous-friendly. Links to meetings take you to official CMA listings or the meeting provider chosen by that group.</p><p>Northstar / CMA Meet is an independent project and is not affiliated with, endorsed by, or sponsored by Crystal Meth Anonymous.</p><aside><strong>If you are in immediate danger or considering harming yourself:</strong> call or text <a href="tel:988">988</a> in the U.S., call <a href="tel:911">911</a>, or use local emergency services where you are.</aside></div>
     </section>
 
-    <footer className="ns-footer"><Wordmark /><div><a href="mailto:support@cmameet.site">support@cmameet.site</a><span aria-hidden="true">·</span><Link to="/privacy">Privacy</Link><span aria-hidden="true">·</span><a href={CMA_DIRECTORY} target="_blank" rel="noreferrer">Official CMA <ExternalLink size={13} aria-hidden="true" /></a></div><p>© 2026 Northstar. Support address shown for future support requests.</p></footer>
+    <footer className="ns-footer"><Wordmark /><div><a href="mailto:support@cmameet.site">support@cmameet.site</a><span aria-hidden="true">·</span><Link to="/privacy">Privacy</Link><span aria-hidden="true">·</span><Link to="/terms">Terms</Link><span aria-hidden="true">·</span><a href={CMA_DIRECTORY} target="_blank" rel="noreferrer">Official CMA <ExternalLink size={13} aria-hidden="true" /></a></div><p>© 2026 Northstar. Support address shown for future support requests.</p></footer>
   </main>;
 }

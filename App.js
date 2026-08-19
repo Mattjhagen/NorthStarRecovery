@@ -17,7 +17,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Contacts from 'expo-contacts';
 import { scheduleDemoInsight, scheduleDailyUplift, cancelDailyUplift, scheduleDailyCheckin, cancelDailyCheckin, scheduleMeetingReminder, scheduleRecurringMeetingReminder, cancelSpecificMeetingReminder, cancelMeetingReminders, sendLocalNotification, getRemotePushToken, addNotificationTapListener } from './notifications';
 import { READINGS } from './readings';
-import { createAccount, confirmAccount, signInWithPassword, restoreSignedInUser, signOutEverywhere } from './auth';
+import { createAccount, confirmAccount, signInWithPassword, restoreSignedInUser, signOutEverywhere, deleteAccount } from './auth';
 import { apiRequest, isBackendConfigured } from './backend';
 
 const C = { ink:'#101827', surface:'#192438', raised:'#233149', mint:'#5DE0A6', blue:'#75B8FF', warm:'#F4F1E8', muted:'#9DADC5', gold:'#F5B95D', line:'#34445d' };
@@ -454,6 +454,29 @@ function AppInner() {
     }},
   ]);
 
+  const handleDeleteAccount = () => Alert.alert(
+    'Delete Account & Data?',
+    'This will permanently delete your account, recovery journal entries, profile, and all associated personal data from our servers. This action cannot be undone.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete Account',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteAccount();
+            setProfile({ pseudonym:'', bio:'', photo:'', dob:'', gender:'', groupPreference:'All groups', sobrietyDate:'', sponsor:{ name:'', phone:'' }, trustedPerson:{ name:'', phone:'', enabled:false }, privacyMode:false });
+            setJournalEntries([]);
+            setAuthState('onboarding');
+            say('Your account and data have been deleted.');
+          } catch {
+            say('Could not complete account deletion. Please try again.');
+          }
+        },
+      },
+    ]
+  );
+
   const totalXP = LEARN_MODULES.slice(0,learnComplete).reduce((s,m)=>s+m.xp,0) + inviteXP;
 
   const saveProfile = async (next) => {
@@ -515,7 +538,7 @@ function AppInner() {
         </View>
         {tab==='Connect'  && <Connect say={say} onMessage={openMessagePeer}/>}
         {tab==='Messages' && <Messages say={say} threads={dmThreads} loading={!dmReadMapLoaded} pendingPeer={pendingDmPeer} onClearPending={()=>setPendingDmPeer(null)} readMap={dmReadMap} onMarkRead={markThreadRead} onRefresh={loadDmThreads}/>}
-        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={['matty@purepulse.one','test@purepulse.one'].includes(authEmail.toLowerCase())} sosEnabled={sosEnabled} onToggleSos={toggleSos} onInviteSent={earnInviteXP}/>}
+        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} onDeleteAccount={handleDeleteAccount} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={['matty@purepulse.one','test@purepulse.one'].includes(authEmail.toLowerCase())} sosEnabled={sosEnabled} onToggleSos={toggleSos} onInviteSent={earnInviteXP}/>}
         {tab==='Journal'  && <Journal say={say} entries={journalEntries} onAdd={addJournalEntry}/>}
       </View>
       <View style={styles.tabbar}>
@@ -691,7 +714,14 @@ function Onboarding({ onComplete }) {
     <SafeAreaView style={styles.onboardSafe}><StatusBar style="light"/>
       <View style={styles.onboardStar}><Icon name="compass" size={40} color={C.mint}/></View>
       <View style={styles.welcomeBody}><Text style={styles.brand}>NORTHSTAR</Text><Text style={styles.welcomeTitle}>A quiet place to find your way back.</Text><Text style={styles.welcomeCopy}>Support, reflection, and connection — at a pace that belongs to you.</Text></View>
-      <View style={styles.welcomeBottom}><Button label="Create an account" onPress={()=>setMode('create')} icon="arrow-forward"/><Pressable onPress={()=>setMode('signin')} style={styles.textButton}><Text style={styles.textButtonLabel}>I already have an account</Text><Icon name="arrow-forward" size={16} color={C.mint}/></Pressable></View>
+      <View style={styles.welcomeBottom}>
+        <Button label="Create an account" onPress={()=>setMode('create')} icon="arrow-forward"/>
+        <Pressable onPress={()=>setMode('signin')} style={styles.textButton}><Text style={styles.textButtonLabel}>I already have an account</Text><Icon name="arrow-forward" size={16} color={C.mint}/></Pressable>
+        <Pressable onPress={()=>{setProfile({pseudonym:'Guest Member',bio:'Exploring Northstar Recovery',photo:'',dob:'',gender:'Prefer not to say',groupPreference:'All groups',sobrietyDate:''});complete();}} style={styles.skip}><Text style={[styles.muted,{fontSize:13}]}>Explore in demo mode</Text></Pressable>
+        <Text style={[styles.muted,{fontSize:11,textAlign:'center',marginTop:4,lineHeight:16}]}>
+          By continuing, you agree to our <Text style={{color:C.mint}} onPress={()=>openWeb('https://cmameet.site/terms')}>Terms of Service (EULA)</Text> and <Text style={{color:C.mint}} onPress={()=>openWeb('https://cmameet.site/privacy')}>Privacy Policy</Text>.
+        </Text>
+      </View>
     </SafeAreaView>
   );
   if (mode==='signin') return (
@@ -737,6 +767,9 @@ function Onboarding({ onComplete }) {
       {message?<Text style={styles.statusNote}>{message}</Text>:null}
       <Button label={busy?'Creating account…':'Continue'} onPress={busy?undefined:handleSignUp} icon="arrow-forward"/>
       <Pressable onPress={()=>setMode('signin')} style={styles.textButton}><Text style={styles.textButtonLabel}>Already have an account? Sign in</Text></Pressable>
+      <Text style={[styles.muted,{fontSize:11,textAlign:'center',marginTop:12,lineHeight:16}]}>
+        By creating an account, you agree to our <Text style={{color:C.mint}} onPress={()=>openWeb('https://cmameet.site/terms')}>Terms of Service (EULA)</Text> and <Text style={{color:C.mint}} onPress={()=>openWeb('https://cmameet.site/privacy')}>Privacy Policy</Text>.
+      </Text>
     </ScrollView></SafeAreaView>
   );
 }
@@ -1578,7 +1611,7 @@ function Connect({ say, onMessage }) {
     <ScrollView contentContainerStyle={styles.scroll}>
       <Text style={styles.eyebrow}>PRIVATE COMMUNITY</Text><Text style={styles.h1}>The circle</Text>
       <Text style={styles.intro}>Questions, stories, and small truths — held with care.</Text>
-      <View style={styles.standard}><Icon name="shield-checkmark" color={C.mint}/><Text style={styles.standardText}>No advice as authority. No pressure to share. If someone feels unsafe, block and report.</Text></View>
+      <View style={styles.standard}><Icon name="shield-checkmark" color={C.mint}/><Text style={styles.standardText}>Zero tolerance for abusive or objectionable content. You can block any member and report posts or messages to moderation at any time.</Text></View>
       <Pressable style={styles.compose} onPress={()=>setCompose(true)}><Icon name="create-outline" color={C.ink}/><Text style={styles.composeText}>Share with the circle</Text></Pressable>
       <Pressable onPress={openSponsors} style={styles.soundscapePicker}>
         <Icon name="hand-left-outline" color={C.mint}/>
@@ -1811,36 +1844,28 @@ function Journal({ say, entries, onAdd }) {
   );
 }
 
-// ─── SUPPORT CARD (Stripe + Venmo) ─────────────────────────────────────────
-function SupportNorthstar({ say }) {
-  const donate = (amount, label) => {
-    Linking.openURL(`venmo://paycharge?txn=pay&recipients=${VENMO_USER}&amount=${amount}&note=Northstar Recovery Support`)
-      .catch(() => Linking.openURL(`https://venmo.com/${VENMO_USER}`));
-  };
+// ─── COMMUNITY CARD ─────────────────────────────────────────────────────────
+function CommunityNorthstar() {
+  const shareApp = () => Share.share({
+    message: "Northstar Recovery — A private recovery companion app: https://cmameet.site",
+    title: 'Northstar Recovery',
+  });
   return (
     <Card style={styles.supportCard}>
       <View style={styles.row}>
         <View style={styles.supportBadge}><Icon name="heart" color={C.ink}/></View>
         <View style={{flex:1}}>
-          <Text style={styles.cardTitle}>Support Northstar</Text>
-          <Text style={styles.muted}>Optional support — every recovery tool stays free.</Text>
+          <Text style={styles.cardTitle}>100% Free & Open</Text>
+          <Text style={styles.muted}>Every recovery tool and feature in Northstar is free for everyone.</Text>
         </View>
       </View>
-      <View style={styles.supportOptions}>
-        {[['$2',2],['$5',5],['$10',10]].map(([label,amount])=>(
-          <Pressable key={label} onPress={()=>donate(amount,label)} style={styles.supportOption}>
-            <Text style={styles.supportPrice}>{label}</Text>
-            <Text style={styles.supportOptionLabel}>one-time</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Text style={styles.supportFinePrint}>Apple Pay, Venmo, and card accepted.</Text>
+      <Button label="Share Northstar" onPress={shareApp} icon="share-social-outline" kind="dark"/>
     </Card>
   );
 }
 
 // ─── YOU ──────────────────────────────────────────────────────────────────────
-function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, entries, saveProfile, isAdmin, sosEnabled, onToggleSos, onInviteSent }) {
+function You({ say, profile, sobrietyDays, editProfile, onSignOut, onDeleteAccount, goJournal, entries, saveProfile, isAdmin, sosEnabled, onToggleSos, onInviteSent }) {
   const [adminOpen, setAdminOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
@@ -2033,8 +2058,26 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
         </SafeAreaView>
       </Modal>
 
-      <Text style={styles.sectionTitle}>SUPPORT NORTHSTAR</Text>
-      <SupportNorthstar say={say}/>
+      <Text style={styles.sectionTitle}>COMMUNITY & SUPPORT</Text>
+      <CommunityNorthstar/>
+
+      <Text style={styles.sectionTitle}>LEGAL & POLICIES</Text>
+      <Card>
+        <Pressable onPress={()=>openWeb('https://cmameet.site/privacy')} style={styles.inlineAction}>
+          <Text style={styles.inlineText}>Privacy Policy</Text>
+          <Icon name="open-outline" size={16} color={C.mint}/>
+        </Pressable>
+        <View style={{height:1,backgroundColor:C.line,marginVertical:8}}/>
+        <Pressable onPress={()=>openWeb('https://cmameet.site/terms')} style={styles.inlineAction}>
+          <Text style={styles.inlineText}>Terms of Service & EULA</Text>
+          <Icon name="open-outline" size={16} color={C.mint}/>
+        </Pressable>
+        <View style={{height:1,backgroundColor:C.line,marginVertical:8}}/>
+        <Pressable onPress={()=>Alert.alert('Medical & Crisis Disclaimer','Northstar Recovery is an independent peer-support companion tool. It does not provide medical advice, psychiatric care, or clinical addiction diagnosis.\n\nIf you are in distress or experiencing a medical emergency, call 988 (Suicide & Crisis Lifeline) or 911 immediately.',[{text:'Understood'}])} style={styles.inlineAction}>
+          <Text style={styles.inlineText}>Medical & Crisis Disclaimer</Text>
+          <Icon name="information-circle-outline" size={16} color={C.gold}/>
+        </Pressable>
+      </Card>
 
       <Text style={styles.sectionTitle}>LITERATURE & RESOURCES</Text>
       <Card>
@@ -2046,9 +2089,14 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, goJournal, en
         </Pressable>
       </Card>
 
-      <Pressable onPress={onSignOut} style={[styles.setting,{borderBottomWidth:0,justifyContent:'center',gap:8,marginTop:8}]}>
+      <Text style={styles.sectionTitle}>ACCOUNT ACTIONS</Text>
+      <Pressable onPress={onSignOut} style={[styles.setting,{borderBottomWidth:0,justifyContent:'center',gap:8,marginTop:4}]}>
         <Icon name="log-out-outline" color={C.muted} size={18}/>
         <Text style={[styles.muted,{fontWeight:'700'}]}>Sign out</Text>
+      </Pressable>
+      <Pressable onPress={onDeleteAccount} style={[styles.setting,{borderBottomWidth:0,justifyContent:'center',gap:8,marginTop:4}]}>
+        <Icon name="trash-outline" color="#ff6b6b" size={18}/>
+        <Text style={[styles.dangerText,{color:'#ff6b6b',fontWeight:'700'}]}>Delete account & data</Text>
       </Pressable>
     </ScrollView>
   );

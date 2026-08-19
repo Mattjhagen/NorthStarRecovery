@@ -120,7 +120,7 @@ def thread_id_for(a, b):
 
 def send_expo_push(token, title, body_text):
     """Best-effort push; failures never break the API call."""
-    if not token or not token.startswith('ExponentPushToken'):
+    if not token or not (token.startswith('ExponentPushToken') or token.startswith('ExpoPushToken')):
         return
     try:
         payload = json.dumps({'to': token, 'title': title, 'body': body_text, 'sound': 'default'}).encode()
@@ -571,7 +571,7 @@ def handler(event, context):
 
     if path == '/v1/push-tokens' and method == 'POST':
         token = str((body or {}).get('token') or '').strip()
-        if not token.startswith('ExponentPushToken') or len(token) > 120:
+        if not (token.startswith('ExponentPushToken') or token.startswith('ExpoPushToken')) or len(token) > 120:
             return reply(400, {'error': 'invalid_token'})
         profile = get_profile(member_id)
         profile['expoPushToken'] = token
