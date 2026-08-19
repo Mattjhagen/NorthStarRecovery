@@ -10,20 +10,30 @@ dist/
 .env.*
 !.env.example
 
-# iOS (not needed for Android builds)
-ios/
+# Large Audio source files (streamed remotely via CloudFront CDN)
+soundscapes/
 
-# Build artifacts and store assets
+# Build artifacts, packages, and local installers
 builds/
+build-*
+*.apk
+*.aab
+*.ipa
+*.jks
+*.pkg
+
+# iOS build cache & Pods (EAS runs pod install in clean environment)
+ios/build/
+ios/Pods/
+
+# Store metadata, screenshots & documentation
 app-store/
 app-store-screenshots/
-
-# Website (not needed for mobile builds)
+aws/
 website/
 
-# Misc
+# Version control & system files
 .DS_Store
 .claude/
 .git/
 .github/
-*.jks

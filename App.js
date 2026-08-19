@@ -347,7 +347,15 @@ function AppInner() {
   const [inviteXP, setInviteXP] = useState(0);
   useEffect(()=>{ SecureStore.getItemAsync('northstar.invite-xp').then(v=>{ const n=parseInt(v,10); if(Number.isFinite(n)&&n>0) setInviteXP(n); }).catch(()=>{}); },[]);
   const earnInviteXP = () => setInviteXP(prev => { const next = Math.min(prev + 10, 200); SecureStore.setItemAsync('northstar.invite-xp', String(next)).catch(()=>{}); return next; });
-  useEffect(() => { restoreSignedInUser().then(u => setAuthState(u ? 'authenticated' : 'onboarding')).catch(() => setAuthState('onboarding')); }, []);
+  useEffect(() => {
+    const minSplash = new Promise(resolve => setTimeout(resolve, 2500));
+    Promise.all([
+      restoreSignedInUser().catch(() => null),
+      minSplash,
+    ]).then(([u]) => {
+      setAuthState(u ? 'authenticated' : 'onboarding');
+    });
+  }, []);
   useEffect(() => {
     if (authState !== 'authenticated') return;
     restoreSignedInUser().then(u => setAuthEmail(u?.signInDetails?.loginId || u?.username || '')).catch(()=>{});
@@ -615,7 +623,10 @@ function SplashScreen() {
   return (
     <SafeAreaView style={styles.splashSafe}><StatusBar style="light"/>
       <View style={styles.splashBg}/><View style={styles.splashBgAccent}/>
-      {[[56,120],[80,290],[24,430],[140,180],[30,350],[160,80],[95,510],[48,600]].map(([x,y],i)=>(
+      {[
+        ['12%','14%'],['84%','18%'],['22%','32%'],['76%','38%'],
+        ['10%','58%'],['88%','64%'],['28%','78%'],['72%','84%']
+      ].map(([x,y],i)=>(
         <Animated.View key={i} style={[styles.splashStar,{left:x,top:y,opacity:starPulse.interpolate({inputRange:[0,1],outputRange:[0.2+i*0.06,0.7+i*0.04]})}]}/>
       ))}
       <Animated.View style={[styles.splashContent,{opacity:textFade}]}>
@@ -623,7 +634,7 @@ function SplashScreen() {
           <Animated.View style={[styles.splashRing,{transform:[{scale:ringScale}],opacity:ringOpacity}]}/>
           <Animated.View style={[styles.splashIconOuter,{transform:[{translateY:floatY}]}]}>
             <View style={styles.splashIconBg}/>
-            <Animated.Text style={[styles.splashIcon,{color:iconColor}]}>âœ¦</Animated.Text>
+            <Animated.Text style={[styles.splashIcon,{color:iconColor}]}>✦</Animated.Text>
           </Animated.View>
         </View>
         <Animated.Text style={[styles.splashBrand,{transform:[{translateY:floatY}]}]}>NORTHSTAR</Animated.Text>
