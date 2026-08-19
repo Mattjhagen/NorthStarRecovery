@@ -34,10 +34,16 @@ jobs:
         working-directory: website
         run: npm run build
 
-      - name: Copy CNAME and 404 into build output
+      - name: Copy CNAME, 404, and Vercel compatibility into build output
         run: |
           cp CNAME website/build/CNAME
           cp website/build/index.html website/build/404.html
+          mkdir -p website/build/website
+          cp website/build/index.html website/build/website/index.html
+          cp website/vercel.json website/build/vercel.json 2>/dev/null || true
+          cp website/vercel.json website/build/website/vercel.json 2>/dev/null || true
+          echo '*' > website/build/.vercelignore
+          echo '*' > website/build/website/.vercelignore
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
