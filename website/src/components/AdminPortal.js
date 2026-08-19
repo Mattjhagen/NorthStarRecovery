@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Shield, Users, Bell, Mail, Trash2, Ban, RefreshCw, 
-  CheckCircle, AlertTriangle, LogOut, Send, Eye, 
+  CheckCircle, AlertTriangle, LogOut, Send, Eye, EyeOff, Lock,
   Activity, ArrowLeft, ExternalLink, Sparkles
 } from 'lucide-react';
 import './AdminPortal.css';
 
 export default function AdminPortal() {
   const [adminEmail, setAdminEmail] = useState(() => localStorage.getItem('ns_admin_email') || 'matty@purepulse.one');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem('ns_admin_auth')));
   const [activeTab, setActiveTab] = useState('overview');
   const [toast, setToast] = useState('');
@@ -79,20 +81,33 @@ export default function AdminPortal() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (!adminEmail.toLowerCase().endsWith('@purepulse.one')) {
-      alert('Access restricted to @purepulse.one administrator accounts.');
+    const email = adminEmail.trim().toLowerCase();
+    const password = adminPassword.trim();
+
+    if (!email.endsWith('@purepulse.one')) {
+      alert('Access restricted to authorized @purepulse.one staff.');
       return;
     }
-    localStorage.setItem('ns_admin_email', adminEmail);
+    if (!password) {
+      alert('Please enter your administrator password.');
+      return;
+    }
+    if (password.length < 6) {
+      alert('Password must be at least 6 characters.');
+      return;
+    }
+
+    localStorage.setItem('ns_admin_email', email);
     localStorage.setItem('ns_admin_auth', 'true');
     setIsAuthenticated(true);
-    showToast(`Welcome back, ${adminEmail}`);
+    showToast(`Authenticated as ${email}`);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('ns_admin_auth');
     localStorage.removeItem('ns_admin_token');
     setIsAuthenticated(false);
+    setAdminPassword('');
   };
 
   // Actions
@@ -238,8 +253,30 @@ export default function AdminPortal() {
                 required 
               />
             </div>
-            <button type="submit" className="ns-btn ns-btn-primary" style={{ width: '100%', marginTop: 8 }}>
-              Enter Admin Portal
+            <div className="ns-form-group">
+              <label className="ns-label">Administrator Password</label>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  className="ns-input" 
+                  placeholder="••••••••••••" 
+                  value={adminPassword} 
+                  onChange={(e) => setAdminPassword(e.target.value)} 
+                  required 
+                  style={{ width: '100%', paddingRight: 42 }}
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)} 
+                  style={{ position: 'absolute', right: 12, background: 'none', border: 'none', color: '#9DADC5', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            <button type="submit" className="ns-btn ns-btn-primary" style={{ width: '100%', marginTop: 12 }}>
+              <Lock size={16} /> Enter Admin Portal
             </button>
           </form>
         </div>
