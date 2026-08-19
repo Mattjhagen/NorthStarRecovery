@@ -39,11 +39,22 @@ jobs:
           cp CNAME website/build/CNAME
           cp website/build/index.html website/build/404.html
           mkdir -p website/build/website
+          cp -r website/build/static website/build/website/ 2>/dev/null || true
           cp website/build/index.html website/build/website/index.html
-          cp website/vercel.json website/build/vercel.json 2>/dev/null || true
-          cp website/vercel.json website/build/website/vercel.json 2>/dev/null || true
-          echo '*' > website/build/.vercelignore
-          echo '*' > website/build/website/.vercelignore
+          cat << 'EOF' > website/build/vercel.json
+          {
+            "framework": null,
+            "buildCommand": "echo 'Static assets ready'",
+            "outputDirectory": ".",
+            "rewrites": [
+              {
+                "source": "/(.*)",
+                "destination": "/index.html"
+              }
+            ]
+          }
+          EOF
+          cp website/build/vercel.json website/build/website/vercel.json
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
