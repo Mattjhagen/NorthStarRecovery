@@ -59,7 +59,13 @@ def generate_pseudonym():
 def reply(status, body=None):
     return {
         'statusCode': status,
-        'headers': {'content-type': 'application/json', 'cache-control': 'no-store'},
+        'headers': {
+            'content-type': 'application/json',
+            'cache-control': 'no-store',
+            'access-control-allow-origin': '*',
+            'access-control-allow-headers': 'content-type,authorization,x-admin-key',
+            'access-control-allow-methods': 'GET,POST,OPTIONS'
+        },
         'body': '' if body is None else json.dumps(body),
     }
 

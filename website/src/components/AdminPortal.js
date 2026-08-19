@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Shield, Users, Bell, Mail, Trash2, Ban, RefreshCw, 
   CheckCircle, LogOut, Send, Eye, EyeOff, Lock,
   Activity, ArrowLeft, ExternalLink, Sparkles, MapPin, 
-  Smartphone, Apple, Globe, Radio, X
+  Smartphone, Apple, Globe, Radio, X, Database
 } from 'lucide-react';
 import './AdminPortal.css';
+
+const API_BASE_URL = 'https://hn83p2e8sg.execute-api.us-east-2.amazonaws.com';
 
 export default function AdminPortal() {
   const [adminEmail, setAdminEmail] = useState(() => localStorage.getItem('ns_admin_email') || 'matty@purepulse.one');
@@ -18,8 +20,13 @@ export default function AdminPortal() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [userFilter, setUserFilter] = useState('all');
 
+  // Live AWS DynamoDB Sync State
+  const [isLiveAws, setIsLiveAws] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState('');
+
   // Overview Stats
-  const [stats] = useState({
+  const [stats, setStats] = useState({
     totalUsers: 142,
     bannedUsers: 2,
     activePushDevices: 98,
@@ -224,16 +231,76 @@ export default function AdminPortal() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetSending, setResetSending] = useState(false);
 
-  const showToast = (msg) => {
+  const showToast = useCallback((msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 3500);
-  };
+  }, []);
 
   const calculateDays = (dateStr) => {
     if (!dateStr) return 0;
     const diff = Date.now() - new Date(dateStr).getTime();
     return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
   };
+
+  // LIVE AWS DYNAMODB SYNC
+  const fetchLiveAwsData = useCallback(async () => {
+    setIsSyncing(true);
+    const token = localStorage.getItem('ns_admin_jwt') || '';
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    try {
+      // 1. Fetch live admin stats from Lambda / DynamoDB
+      const statsRes = await fetch(`${API_BASE_URL}/v1/admin/stats`, { headers }).catch(() => null);
+      if (statsRes && statsRes.ok) {
+        const liveStats = await statsRes.json();
+        setStats(prev => ({
+          ...prev,
+          totalUsers: liveStats.totalUsers ?? prev.totalUsers,
+          bannedUsers: liveStats.bannedUsers ?? prev.bannedUsers,
+          activePushDevices: liveStats.activePushDevices ?? prev.activePushDevices,
+          availableSponsors: liveStats.availableSponsors ?? prev.availableSponsors,
+          pendingReports: liveStats.pendingReports ?? prev.pendingReports,
+        }));
+        setIsLiveAws(true);
+      }
+
+      // 2. Fetch live users list
+      const usersRes = await fetch(`${API_BASE_URL}/v1/admin/users`, { headers }).catch(() => null);
+      if (usersRes && usersRes.ok) {
+        const liveUsersData = await usersRes.json();
+        if (Array.isArray(liveUsersData.users) && liveUsersData.users.length > 0) {
+          setUsers(liveUsersData.users);
+          setIsLiveAws(true);
+        }
+      }
+
+      // 3. Fetch live reports
+      const reportsRes = await fetch(`${API_BASE_URL}/v1/admin/reports`, { headers }).catch(() => null);
+      if (reportsRes && reportsRes.ok) {
+        const liveReportsData = await reportsRes.json();
+        if (Array.isArray(liveReportsData.reports)) {
+          setReports(liveReportsData.reports);
+          setIsLiveAws(true);
+        }
+      }
+
+      setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      showToast('Synced with live AWS DynamoDB database.');
+    } catch (e) {
+      console.warn('Live AWS sync error:', e);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchLiveAwsData();
+    }
+  }, [isAuthenticated, fetchLiveAwsData]);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -262,6 +329,7 @@ export default function AdminPortal() {
     localStorage.setItem('ns_admin_auth', 'true');
     setIsAuthenticated(true);
     showToast(`Authenticated as ${email}`);
+    fetchLiveAwsData();
   };
 
   const handleSendResetCode = async (e) => {
@@ -348,11 +416,13 @@ export default function AdminPortal() {
     setNewPassword('');
     setConfirmPassword('');
     showToast('Password reset successfully! Welcome to Admin Portal.');
+    fetchLiveAwsData();
   };
 
   const handleLogout = () => {
     localStorage.removeItem('ns_admin_auth');
     localStorage.removeItem('ns_admin_token');
+    localStorage.removeItem('ns_admin_jwt');
     setIsAuthenticated(false);
     setAdminPassword('');
   };
@@ -664,8 +734,8 @@ export default function AdminPortal() {
   }
 
   const filteredUsers = users.filter(u => {
-    const matchesSearch = u.pseudonym.toLowerCase().includes(userSearch.toLowerCase()) || 
-      u.memberId.toLowerCase().includes(userSearch.toLowerCase()) ||
+    const matchesSearch = (u.pseudonym || '').toLowerCase().includes(userSearch.toLowerCase()) || 
+      (u.memberId || '').toLowerCase().includes(userSearch.toLowerCase()) ||
       (u.location && u.location.toLowerCase().includes(userSearch.toLowerCase()));
 
     if (!matchesSearch) return false;
@@ -688,11 +758,26 @@ export default function AdminPortal() {
 
       {/* Top Header */}
       <header className="ns-admin-header">
-        <Link className="ns-admin-brand" to="/">
-          <span style={{ fontSize: 18, fontWeight: 900 }}>NORTHSTAR</span>
-          <span className="ns-admin-badge">Admin Portal</span>
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <Link className="ns-admin-brand" to="/">
+            <span style={{ fontSize: 18, fontWeight: 900 }}>NORTHSTAR</span>
+            <span className="ns-admin-badge">Admin Portal</span>
+          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: isLiveAws ? '#5DE0A6' : '#F5B95D' }}>
+            <Database size={13} />
+            <span>{isLiveAws ? 'Live DynamoDB (us-east-2)' : 'Demo / Preview Data'}</span>
+            {lastSyncTime && <span style={{ color: '#9DADC5', fontSize: 11 }}>• Synced {lastSyncTime}</span>}
+          </div>
+        </div>
         <div className="ns-admin-user-nav">
+          <button 
+            onClick={fetchLiveAwsData} 
+            className="ns-btn ns-btn-secondary ns-btn-sm" 
+            disabled={isSyncing}
+            title="Refresh from AWS DynamoDB"
+          >
+            <RefreshCw size={13} className={isSyncing ? 'ns-spin' : ''} /> {isSyncing ? 'Syncing...' : 'Sync DynamoDB'}
+          </button>
           <span className="ns-admin-email-tag">
             <Shield size={14} color="#5DE0A6" />
             {adminEmail}
@@ -761,8 +846,15 @@ export default function AdminPortal() {
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
             <div>
-              <h1 className="ns-admin-page-title">System Overview & Telemetry</h1>
-              <p className="ns-admin-page-sub">Real-time statistics for Northstar Recovery companion network.</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <h1 className="ns-admin-page-title">System Overview & Telemetry</h1>
+                  <p className="ns-admin-page-sub">Real-time statistics for Northstar Recovery companion network.</p>
+                </div>
+                <button className="ns-btn ns-btn-secondary ns-btn-sm" onClick={fetchLiveAwsData} disabled={isSyncing}>
+                  <RefreshCw size={13} /> {isSyncing ? 'Syncing...' : 'Refresh DynamoDB Data'}
+                </button>
+              </div>
 
               <div className="ns-admin-grid-4">
                 <div className="ns-stat-card">
@@ -844,7 +936,7 @@ export default function AdminPortal() {
                     <h2 className="ns-card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <MapPin size={18} color="#75B8FF" /> Top Member Regions (Coarse)
                     </h2>
-                    <span className="ns-tag ns-tag-active">34 SOS Guardians</span>
+                    <span className="ns-tag ns-tag-active">{stats.sosGuardians} SOS Guardians</span>
                   </div>
 
                   <div className="ns-meter-row">
@@ -1389,7 +1481,7 @@ export default function AdminPortal() {
                 <span className="ns-detail-kicker">Device Platform</span>
                 <span className="ns-detail-val" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {selectedUser.deviceType === 'iOS' ? <Apple size={14} /> : <Smartphone size={14} />}
-                  {selectedUser.deviceModel || selectedUser.deviceType}
+                  {selectedUser.deviceModel || selectedUser.deviceType || 'Mobile App'}
                 </span>
               </div>
 
