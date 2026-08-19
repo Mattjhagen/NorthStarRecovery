@@ -26,6 +26,7 @@
     "expo-calendar": "~15.0.8",
     "expo-clipboard": "~8.0.8",
     "expo-contacts": "~15.0.11",
+    "expo-dev-client": "~6.0.21",
     "expo-font": "~14.0.12",
     "expo-haptics": "~15.0.8",
     "expo-image-picker": "~17.0.11",
@@ -45,6 +46,7 @@
   "private": true,
   "devDependencies": {
     "eslint": "^9.39.5",
-    "eslint-config-expo": "~10.0.0"
+    "eslint-config-expo": "~10.0.0",
+    "expo-mcp": "~0.2.1"
   }
 }

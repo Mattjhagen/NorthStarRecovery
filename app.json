@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Northstar Recovery",
-    "slug": "mattyjames",
+    "slug": "northstar",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
@@ -93,14 +93,18 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE",
-        "android.permission.RECEIVE_BOOT_COMPLETED"
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
       ]
     },
     "extra": {
       "eas": {
-        "projectId": "e2814d89-03ca-4798-a753-a56b695364f5"
+        "projectId": "bbb84206-162c-496e-92d3-60aa0df82e3e"
       }
     },
-    "owner": "northstar-recovery"
+    "owner": "app_northstar"
   }
 }

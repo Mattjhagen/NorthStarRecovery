@@ -7,25 +7,55 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_AWS_REGION": "us-east-2",
+        "EXPO_PUBLIC_API_BASE_URL": "https://hn83p2e8sg.execute-api.us-east-2.amazonaws.com",
+        "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-2_k8uNPYlsr",
+        "EXPO_PUBLIC_COGNITO_APP_CLIENT_ID": "6ga7cb5ald72vo753trogruhme"
+      }
     },
     "preview": {
       "distribution": "store",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_AWS_REGION": "us-east-2",
+        "EXPO_PUBLIC_API_BASE_URL": "https://hn83p2e8sg.execute-api.us-east-2.amazonaws.com",
+        "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-2_k8uNPYlsr",
+        "EXPO_PUBLIC_COGNITO_APP_CLIENT_ID": "6ga7cb5ald72vo753trogruhme"
+      }
     },
     "sim": {
       "distribution": "internal",
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_AWS_REGION": "us-east-2",
+        "EXPO_PUBLIC_API_BASE_URL": "https://hn83p2e8sg.execute-api.us-east-2.amazonaws.com",
+        "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-2_k8uNPYlsr",
+        "EXPO_PUBLIC_COGNITO_APP_CLIENT_ID": "6ga7cb5ald72vo753trogruhme"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_AWS_REGION": "us-east-2",
+        "EXPO_PUBLIC_API_BASE_URL": "https://hn83p2e8sg.execute-api.us-east-2.amazonaws.com",
+        "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-2_k8uNPYlsr",
+        "EXPO_PUBLIC_COGNITO_APP_CLIENT_ID": "6ga7cb5ald72vo753trogruhme"
+      }
     },
     "apk": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_AWS_REGION": "us-east-2",
+        "EXPO_PUBLIC_API_BASE_URL": "https://hn83p2e8sg.execute-api.us-east-2.amazonaws.com",
+        "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-2_k8uNPYlsr",
+        "EXPO_PUBLIC_COGNITO_APP_CLIENT_ID": "6ga7cb5ald72vo753trogruhme"
       }
     }
   },
