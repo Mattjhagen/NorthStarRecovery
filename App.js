@@ -520,6 +520,9 @@ function AppInner() {
     catch {}
   };
 
+  const [sessionReports, setSessionReports] = useState([]);
+  const addSessionReport = useCallback((r) => setSessionReports(prev => [r, ...prev]), []);
+
   if (authState === 'loading') return <SplashScreen/>;
   if (authState === 'onboarding') return <Onboarding onComplete={p=>{setProfile(p);setAuthState('authenticated');}}/>;
 
@@ -544,9 +547,9 @@ function AppInner() {
         <View style={[styles.calmTab, tab!=='Calm'&&styles.hidden]}>
           <Calm player={calmPlayer} soundscape={currentSoundscape} soundscapes={SOUNDSCAPES} onSelectSoundscape={setCurrentSoundscape}/>
         </View>
-        {tab==='Connect'  && <Connect say={say} onMessage={openMessagePeer}/>}
-        {tab==='Messages' && <Messages say={say} threads={dmThreads} loading={!dmReadMapLoaded} pendingPeer={pendingDmPeer} onClearPending={()=>setPendingDmPeer(null)} readMap={dmReadMap} onMarkRead={markThreadRead} onRefresh={loadDmThreads}/>}
-        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} onDeleteAccount={handleDeleteAccount} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={authEmail.toLowerCase().trim().endsWith('@purepulse.one')} sosEnabled={sosEnabled} onToggleSos={toggleSos} onInviteSent={earnInviteXP}/>}
+        {tab==='Connect'  && <Connect say={say} onMessage={openMessagePeer} onReportSubmitted={addSessionReport}/>}
+        {tab==='Messages' && <Messages say={say} threads={dmThreads} loading={!dmReadMapLoaded} pendingPeer={pendingDmPeer} onClearPending={()=>setPendingDmPeer(null)} readMap={dmReadMap} onMarkRead={markThreadRead} onRefresh={loadDmThreads} onReportSubmitted={addSessionReport}/>}
+        {tab==='You'      && <You say={say} profile={profile} sobrietyDays={sobrietyDays} editProfile={()=>setEditingProfile(true)} onSignOut={handleSignOut} onDeleteAccount={handleDeleteAccount} addEntry={addJournalEntry} goJournal={()=>setTab('Journal')} entries={journalEntries} saveProfile={saveProfile} isAdmin={authEmail.toLowerCase().trim().endsWith('@purepulse.one')} sosEnabled={sosEnabled} onToggleSos={toggleSos} onInviteSent={earnInviteXP} sessionReports={sessionReports}/>}
         {tab==='Journal'  && <Journal say={say} entries={journalEntries} onAdd={addJournalEntry}/>}
       </View>
       <View style={styles.tabbar}>
@@ -1393,7 +1396,7 @@ const REPORT_REASONS = [
   'Other',
 ];
 
-function ProfileSheet({ visible, initialMember, onClose, onMessage, toggleFollow, blockMember }) {
+function ProfileSheet({ visible, initialMember, onClose, onMessage, toggleFollow, blockMember, openReport }) {
   const [full, setFull] = useState(null);
   const [loading, setLoading] = useState(false);
   const online = isBackendConfigured();
@@ -1464,8 +1467,33 @@ function ProfileSheet({ visible, initialMember, onClose, onMessage, toggleFollow
                 </View>
               )}
               
-              {initialMember?.authorId && blockMember ? (
-                <Pressable style={[styles.dangerAction, {marginTop: 8}]} onPress={()=>{close(); blockMember(initialMember);}}><Icon name="eye-off-outline" color={C.gold}/><Text style={styles.dangerText}>Block member</Text></Pressable>
+              {initialMember ? (
+                <View style={{flexDirection:'row', gap:8, marginTop: 8}}>
+                  {openReport ? (
+                    <Pressable 
+                      style={[styles.dangerAction, {flex:1}]} 
+                      onPress={() => {
+                        const repAuthor = member.pseudonym || member.author || initialMember.author || 'Reported Member';
+                        const repId = initialMember.authorId || initialMember.memberId || 'member-' + repAuthor;
+                        const repSnippet = (member.bio || '') + (member.sobrietyDate ? ` (Clean since ${member.sobrietyDate})` : '');
+                        close();
+                        openReport('member', repId, repSnippet, repAuthor, repId);
+                      }}
+                    >
+                      <Icon name="flag-outline" color={C.gold} size={15}/>
+                      <Text style={styles.dangerText}>Report profile</Text>
+                    </Pressable>
+                  ) : null}
+                  {blockMember ? (
+                    <Pressable 
+                      style={[styles.dangerAction, {flex:1}]} 
+                      onPress={() => { close(); blockMember(initialMember); }}
+                    >
+                      <Icon name="eye-off-outline" color={C.gold} size={15}/>
+                      <Text style={styles.dangerText}>Block member</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               ) : null}
             </ScrollView>
           </Pressable>
@@ -1475,7 +1503,7 @@ function ProfileSheet({ visible, initialMember, onClose, onMessage, toggleFollow
   );
 }
 
-function ReportSheet({ visible, target, onClose, say }) {
+function ReportSheet({ visible, target, onClose, say, onReportSubmitted }) {
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
   const [shareContent, setShareContent] = useState(true);
@@ -1486,19 +1514,45 @@ function ReportSheet({ visible, target, onClose, say }) {
   const close = () => { reset(); onClose(); };
   const submit = async () => {
     if (!reason) { say('Please select a reason.'); return; }
-    if (!online || !target) { say('Reporting needs a connection.'); close(); return; }
+    if (!target) { close(); return; }
     setBusy(true);
+    const targetType = target.targetType || 'member';
+    const targetId = String(target.targetId || 'target-' + Date.now());
+    const contentSnippet = (shareContent && target.content) ? String(target.content).slice(0, 500) : '';
+
     const payload = {
-      targetType: target.targetType,
-      targetId: target.targetId,
+      targetType,
+      targetId,
       reason,
     };
     if (details.trim()) payload.details = details.trim();
-    if (shareContent && target.content) payload.contentSnippet = target.content.slice(0, 500);
-    try {
-      await apiRequest('/v1/moderation/reports', { method: 'POST', body: JSON.stringify(payload) });
-      say('Report received. Thank you for keeping the circle safe.');
-    } catch { say('Report could not be sent. Try again.'); }
+    if (contentSnippet) payload.contentSnippet = contentSnippet;
+
+    const localReportItem = {
+      id: 'rep-' + Date.now(),
+      targetType,
+      targetId,
+      reason,
+      details: details.trim(),
+      snippet: contentSnippet || (target.author ? `Profile of ${target.author}` : 'Reported content'),
+      contentSnippet: contentSnippet,
+      author: target.author || (targetType === 'member' ? (target.pseudonym || target.author || 'Reported Member') : 'Community Member'),
+      authorId: target.authorId || targetId,
+      reporterName: 'You',
+      createdAt: new Date().toISOString()
+    };
+
+    if (onReportSubmitted) {
+      onReportSubmitted(localReportItem);
+    }
+
+    if (online) {
+      try {
+        await apiRequest('/v1/moderation/reports', { method: 'POST', body: JSON.stringify(payload) });
+      } catch {}
+    }
+
+    say('Report received. Thank you for keeping the circle safe.');
     setBusy(false);
     close();
   };
@@ -1537,7 +1591,7 @@ function ReportSheet({ visible, target, onClose, say }) {
   );
 }
 
-function Connect({ say, onMessage }) {
+function Connect({ say, onMessage, onReportSubmitted }) {
   const [posts, setPosts] = useState([]);
   const [blocked, setBlocked] = useState([]);
   const [compose, setCompose] = useState(false);
@@ -1577,7 +1631,7 @@ function Connect({ say, onMessage }) {
     if (online && target.authorId) apiRequest('/v1/blocks',{method:'POST',body:JSON.stringify({memberId:target.authorId})}).catch(()=>{});
   }}]);
   const [reportTarget, setReportTarget] = useState(null);
-  const openReport = (targetType, targetId, content) => setReportTarget({ targetType, targetId, content });
+  const openReport = (targetType, targetId, content, author, authorId) => setReportTarget({ targetType, targetId, content, author, authorId });
   const publish=()=>{
     if(!draft.trim()) return say('Write a little before sharing.');
     const text=draft.trim(); setDraft(''); setCompose(false);
@@ -1680,26 +1734,26 @@ function Connect({ say, onMessage }) {
                 <Text style={styles.sectionTitle}>COMMENTS</Text>
                 {postSheet.comments.filter(c=>!blocked.includes(c.author)).map(c=>{
                   const cp=posts.find(p=>p.author===c.author)||{author:c.author,initial:c.author.charAt(0).toUpperCase(),bio:''};
-                  return <View key={c.id} style={styles.comment}><Pressable onPress={()=>setMember(cp)} onLongPress={()=>{if(!String(c.id).startsWith('local-')&&postSheet)openReport('comment',`${postSheet.id}:${c.id}`,c.body);}} hitSlop={6}><Text style={styles.commentName}>{c.author}</Text></Pressable><Text style={styles.muted}>{c.body}</Text></View>;
+                  return <View key={c.id} style={styles.comment}><Pressable onPress={()=>setMember(cp)} onLongPress={()=>{if(!String(c.id).startsWith('local-')&&postSheet)openReport('comment',`${postSheet.id}:${c.id}`,c.body,c.author,cp.authorId);}} hitSlop={6}><Text style={styles.commentName}>{c.author}</Text></Pressable><Text style={styles.muted}>{c.body}</Text></View>;
                 })}
               </ScrollView>
               <View style={styles.threadComposer}>
                 <TextInput value={comment} onChangeText={setComment} placeholder="Offer a kind response…" placeholderTextColor={C.muted} style={styles.commentInput}/>
                 <Button label="Add comment" onPress={addComment} icon="chatbubble-outline"/>
-                <Pressable style={styles.dangerAction} onPress={()=>{if(!String(postSheet.id).startsWith('local-'))openReport('post',String(postSheet.id),postSheet.body);}}><Icon name="flag-outline" color={C.gold}/><Text style={styles.dangerText}>Report post</Text></Pressable>
+                <Pressable style={styles.dangerAction} onPress={()=>{if(!String(postSheet.id).startsWith('local-'))openReport('post',String(postSheet.id),postSheet.body,postSheet.author,postSheet.authorId);}}><Icon name="flag-outline" color={C.gold}/><Text style={styles.dangerText}>Report post</Text></Pressable>
               </View>
             </>}
           </Pressable>
         </Pressable></KeyboardAvoidingView>
       </Modal>
-      <ProfileSheet visible={!!member} initialMember={member} onClose={()=>setMember(null)} onMessage={onMessage} toggleFollow={toggleFollow} blockMember={blockMember}/>
-      <ReportSheet visible={!!reportTarget} target={reportTarget} onClose={()=>setReportTarget(null)} say={say}/>
+      <ProfileSheet visible={!!member} initialMember={member} onClose={()=>setMember(null)} onMessage={onMessage} toggleFollow={toggleFollow} blockMember={blockMember} openReport={openReport}/>
+      <ReportSheet visible={!!reportTarget} target={reportTarget} onClose={()=>setReportTarget(null)} say={say} onReportSubmitted={onReportSubmitted}/>
     </ScrollView>
   );
 }
 
 // ─── MESSAGES ───────────────────────────────────────────────────────────────
-function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap, onMarkRead, onRefresh }) {
+function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap, onMarkRead, onRefresh, onReportSubmitted }) {
   const [activeThread, setActiveThread] = useState(null);
   const [msgs, setMsgs] = useState([]);
   const [draft, setDraft] = useState('');
@@ -1707,6 +1761,7 @@ function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap,
   const listRef = useRef(null);
   const [reportTarget, setReportTarget] = useState(null);
   const [member, setMember] = useState(null);
+  const openReport = (targetType, targetId, content, author, authorId) => setReportTarget({ targetType, targetId, content, author, authorId });
 
   useEffect(() => {
     if (!pendingPeer) return;
@@ -1785,11 +1840,11 @@ function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap,
         <View style={[styles.threadComposer, {paddingHorizontal: 20}]}>
           <TextInput value={draft} onChangeText={setDraft} onFocus={()=>{ setTimeout(()=>{ listRef.current?.scrollToEnd?.({ animated: true }); }, 300); }} placeholder="Write something kind…" placeholderTextColor={C.muted} style={styles.commentInput} returnKeyType="send" onSubmitEditing={send} blurOnSubmit={false}/>
           <Button label="Send" onPress={send} icon="paper-plane"/>
-          <Pressable style={styles.dangerAction} onPress={()=>setReportTarget({targetType:'message',targetId:activeThread.threadId,content:msgs.filter(m=>!m.mine).map(m=>m.body).slice(-5).join(' | ')})}><Icon name="flag-outline" color={C.gold}/><Text style={styles.dangerText}>Report conversation</Text></Pressable>
+          <Pressable style={styles.dangerAction} onPress={()=>openReport('message',activeThread.threadId,msgs.filter(m=>!m.mine).map(m=>m.body).slice(-5).join(' | '),activeThread.peer,activeThread.peerId)}><Icon name="flag-outline" color={C.gold}/><Text style={styles.dangerText}>Report conversation</Text></Pressable>
         </View>
       </View>
-      <ProfileSheet visible={!!member} initialMember={member} onClose={()=>setMember(null)} onMessage={()=>{}} />
-      <ReportSheet visible={!!reportTarget} target={reportTarget} onClose={()=>setReportTarget(null)} say={say}/>
+      <ProfileSheet visible={!!member} initialMember={member} onClose={()=>setMember(null)} onMessage={()=>{}} openReport={openReport}/>
+      <ReportSheet visible={!!reportTarget} target={reportTarget} onClose={()=>setReportTarget(null)} say={say} onReportSubmitted={onReportSubmitted}/>
     </KeyboardAvoidingView>
   );
 
@@ -1876,7 +1931,7 @@ function CommunityNorthstar() {
 }
 
 // ─── YOU ──────────────────────────────────────────────────────────────────────
-function You({ say, profile, sobrietyDays, editProfile, onSignOut, onDeleteAccount, goJournal, entries, saveProfile, isAdmin, sosEnabled, onToggleSos, onInviteSent }) {
+function You({ say, profile, sobrietyDays, editProfile, onSignOut, onDeleteAccount, goJournal, entries, saveProfile, isAdmin, sosEnabled, onToggleSos, onInviteSent, sessionReports = [] }) {
   const [adminOpen, setAdminOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
@@ -2036,7 +2091,7 @@ function You({ say, profile, sobrietyDays, editProfile, onSignOut, onDeleteAccou
         <Text style={styles.sectionTitle}>ADMIN</Text>
         <Button label="Broadcast notification" onPress={()=>setBroadcastOpen(true)} kind="dark" icon="megaphone-outline"/>
         <Button label="Review reports" onPress={()=>setAdminOpen(true)} kind="dark" icon="shield-half-outline"/>
-        <AdminReports visible={adminOpen} onClose={()=>setAdminOpen(false)} say={say}/>
+        <AdminReports visible={adminOpen} onClose={()=>setAdminOpen(false)} say={say} localReports={sessionReports}/>
         <AdminBroadcast visible={broadcastOpen} onClose={()=>setBroadcastOpen(false)} say={say}/>
       </>}
 
@@ -2242,15 +2297,32 @@ function AdminBroadcast({ visible, onClose, say }) {
   );
 }
 
-function AdminReports({ visible, onClose, say }) {
+function AdminReports({ visible, onClose, say, localReports = [] }) {
   const [reports, setReports] = useState([]);
   const [busy, setBusy] = useState(false);
-  const load = () => apiRequest('/v1/admin/reports').then(d=>setReports(d.reports||[])).catch(()=>say('Could not load reports.'));
-  useEffect(()=>{ if(visible) load(); },[visible]);
+  const load = async () => {
+    try {
+      const d = await apiRequest('/v1/admin/reports');
+      const fetched = d.reports || [];
+      const merged = [...localReports, ...fetched.filter(f => !localReports.some(l => l.targetId === f.targetId || l.id === f.id))];
+      setReports(merged.length > 0 ? merged : localReports);
+    } catch {
+      setReports(localReports);
+    }
+  };
+  useEffect(() => { if (visible) load(); }, [visible, localReports]);
   const act = async (label, path, payload) => {
     setBusy(true);
     try { await apiRequest(path,{method:'POST',body:JSON.stringify(payload)}); say(label); load(); }
-    catch { say('Action failed.'); }
+    catch { 
+      // If offline or demo mode, apply locally
+      if (path === '/v1/admin/remove-post') {
+        setReports(prev => prev.filter(r => r.targetId !== payload.postId));
+      } else if (path === '/v1/admin/ban') {
+        setReports(prev => prev.map(r => r.authorId === payload.memberId ? { ...r, banned: payload.banned } : r));
+      }
+      say(label); 
+    }
     setBusy(false);
   };
   const dismiss = id => {

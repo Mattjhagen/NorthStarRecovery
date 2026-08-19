@@ -401,8 +401,9 @@ def handler(event, context):
                     pass
                 elif i['targetType'] == 'member':
                     target_profile = get_profile(i['targetId'])
-                    entry['authorId'] = i['targetId']
-                    entry['author'] = pseudonym_of(target_profile)
+                    entry['authorId'] = i.get('authorId') or i['targetId']
+                    entry['author'] = i.get('author') or pseudonym_of(target_profile) or 'Reported Member'
+                    entry['snippet'] = i.get('contentSnippet') or i.get('details') or ''
                 reports.append(entry)
             return reply(200, {'reports': reports})
         if path == '/v1/admin/ban' and method == 'POST':
@@ -728,6 +729,8 @@ def handler(event, context):
         reason = str((body or {}).get('reason') or '').strip()
         details = str((body or {}).get('details') or '').strip()[:500]
         content_snippet = str((body or {}).get('contentSnippet') or '').strip()[:500]
+        author = str((body or {}).get('author') or '').strip()[:100]
+        author_id = str((body or {}).get('authorId') or '').strip()[:64]
         if target_type not in ['post', 'comment', 'message', 'member'] or not target_id or len(target_id) > 128 or len(reason) > 500:
             return reply(400, {'error': 'invalid_report'})
         reporter = get_profile(member_id)
@@ -742,6 +745,10 @@ def handler(event, context):
             item['details'] = details
         if content_snippet:
             item['contentSnippet'] = content_snippet
+        if author:
+            item['author'] = author
+        if author_id:
+            item['authorId'] = author_id
         community.put_item(Item=item)
         return reply(201, {'status': 'received'})
 
