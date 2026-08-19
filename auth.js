@@ -3,8 +3,8 @@ import { Amplify } from 'aws-amplify';
 import { confirmSignUp, deleteUser, fetchAuthSession, getCurrentUser, signIn, signOut, signUp } from 'aws-amplify/auth';
 import { apiRequest, clearAccessToken, isBackendConfigured, saveAccessToken } from './backend';
 
-const userPoolId = process.env.EXPO_PUBLIC_COGNITO_USER_POOL_ID;
-const userPoolClientId = process.env.EXPO_PUBLIC_COGNITO_APP_CLIENT_ID;
+const userPoolId = process.env.EXPO_PUBLIC_COGNITO_USER_POOL_ID || 'us-east-2_k8uNPYlsr';
+const userPoolClientId = process.env.EXPO_PUBLIC_COGNITO_APP_CLIENT_ID || '6ga7cb5ald72vo753trogruhme';
 
 if (userPoolId && userPoolClientId) {
   Amplify.configure({

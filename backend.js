@@ -3,10 +3,10 @@ import * as SecureStore from 'expo-secure-store';
 // Expo only embeds EXPO_PUBLIC_* values in the app. This file deliberately
 // rejects missing configuration and never accepts AWS access keys on-device.
 const config = Object.freeze({
-  region: process.env.EXPO_PUBLIC_AWS_REGION,
-  apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, ''),
-  userPoolId: process.env.EXPO_PUBLIC_COGNITO_USER_POOL_ID,
-  userPoolClientId: process.env.EXPO_PUBLIC_COGNITO_APP_CLIENT_ID,
+  region: process.env.EXPO_PUBLIC_AWS_REGION || 'us-east-2',
+  apiBaseUrl: (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hn83p2e8sg.execute-api.us-east-2.amazonaws.com').replace(/\/$/, ''),
+  userPoolId: process.env.EXPO_PUBLIC_COGNITO_USER_POOL_ID || 'us-east-2_k8uNPYlsr',
+  userPoolClientId: process.env.EXPO_PUBLIC_COGNITO_APP_CLIENT_ID || '6ga7cb5ald72vo753trogruhme',
 });
 
 const ACCESS_TOKEN_KEY = 'northstar.access-token';
