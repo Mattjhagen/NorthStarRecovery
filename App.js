@@ -1648,10 +1648,58 @@ function Connect({ say, onMessage, onReportSubmitted }) {
   };
 
   const visiblePosts = posts.filter(p=>!blocked.includes(p.author));
-  const blockMember = target=>Alert.alert(`Block ${target.author}?`,'Their posts and comments will be hidden.',[{text:'Cancel',style:'cancel'},{text:'Block member',style:'destructive',onPress:()=>{
-    setBlocked(b=>[...b,target.author]);setMember(null);setPostSheet(null);say(`${target.author} is now hidden.`);
-    if (online && target.authorId) apiRequest('/v1/blocks',{method:'POST',body:JSON.stringify({memberId:target.authorId})}).catch(()=>{});
-  }}]);
+  const blockMember = target => {
+    const authorName = target.author || target.pseudonym || 'member';
+    Alert.alert(`Block ${authorName}?`, 'Their posts and comments will be hidden and sent to moderation review.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block member',
+        style: 'destructive',
+        onPress: () => {
+          const authorId = target.authorId || target.memberId || 'member-' + authorName;
+          setBlocked(b => [...b, authorName]);
+          setMember(null);
+          setPostSheet(null);
+          say(`${authorName} is now blocked and hidden.`);
+
+          const reportItem = {
+            id: 'block-' + Date.now(),
+            targetType: 'member',
+            targetId: authorId,
+            reason: 'Member blocked by user',
+            details: `User blocked ${authorName} from their circle and requested review.`,
+            snippet: target.bio || `Profile of ${authorName}`,
+            contentSnippet: target.bio || `Profile of ${authorName}`,
+            author: authorName,
+            authorId: authorId,
+            reporterName: 'You',
+            createdAt: new Date().toISOString()
+          };
+
+          if (onReportSubmitted) {
+            onReportSubmitted(reportItem);
+          }
+
+          if (online) {
+            if (target.authorId) {
+              apiRequest('/v1/blocks', { method: 'POST', body: JSON.stringify({ memberId: target.authorId }) }).catch(() => {});
+            }
+            apiRequest('/v1/moderation/reports', {
+              method: 'POST',
+              body: JSON.stringify({
+                targetType: 'member',
+                targetId: authorId,
+                reason: 'Member blocked by user',
+                details: `User blocked ${authorName} from their circle.`,
+                author: authorName,
+                authorId: authorId
+              })
+            }).catch(() => {});
+          }
+        }
+      }
+    ]);
+  };
   const [reportTarget, setReportTarget] = useState(null);
   const openReport = (targetType, targetId, content, author, authorId) => setReportTarget({ targetType, targetId, content, author, authorId });
   const publish=()=>{
@@ -1830,6 +1878,58 @@ function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap,
     </View>
   ), [activeThread]);
 
+  const blockMember = target => {
+    const authorName = target.author || target.pseudonym || activeThread?.peer || 'member';
+    Alert.alert(`Block ${authorName}?`, 'Their messages will be hidden and sent to moderation review.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block member',
+        style: 'destructive',
+        onPress: () => {
+          const authorId = target.authorId || target.memberId || activeThread?.peerId || 'member-' + authorName;
+          setMember(null);
+          setActiveThread(null);
+          say(`${authorName} is now blocked and hidden.`);
+
+          const reportItem = {
+            id: 'block-' + Date.now(),
+            targetType: 'member',
+            targetId: authorId,
+            reason: 'Member blocked in direct messages',
+            details: `User blocked ${authorName} in private direct messaging.`,
+            snippet: `Conversation with ${authorName}`,
+            contentSnippet: `Conversation with ${authorName}`,
+            author: authorName,
+            authorId: authorId,
+            reporterName: 'You',
+            createdAt: new Date().toISOString()
+          };
+
+          if (onReportSubmitted) {
+            onReportSubmitted(reportItem);
+          }
+
+          if (online) {
+            if (authorId) {
+              apiRequest('/v1/blocks', { method: 'POST', body: JSON.stringify({ memberId: authorId }) }).catch(() => {});
+            }
+            apiRequest('/v1/moderation/reports', {
+              method: 'POST',
+              body: JSON.stringify({
+                targetType: 'member',
+                targetId: authorId,
+                reason: 'Member blocked in direct messages',
+                details: `User blocked ${authorName} in private direct messaging.`,
+                author: authorName,
+                authorId: authorId
+              })
+            }).catch(() => {});
+          }
+        }
+      }
+    ]);
+  };
+
   if (!online) return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <Text style={styles.eyebrow}>PRIVATE</Text><Text style={styles.h1}>Messages</Text>
@@ -1865,7 +1965,7 @@ function Messages({ say, threads, loading, pendingPeer, onClearPending, readMap,
           <Pressable style={styles.dangerAction} onPress={()=>openReport('message',activeThread.threadId,msgs.filter(m=>!m.mine).map(m=>m.body).slice(-5).join(' | '),activeThread.peer,activeThread.peerId)}><Icon name="flag-outline" color={C.gold}/><Text style={styles.dangerText}>Report conversation</Text></Pressable>
         </View>
       </View>
-      <ProfileSheet visible={!!member} initialMember={member} onClose={()=>setMember(null)} onMessage={()=>{}} openReport={openReport}/>
+      <ProfileSheet visible={!!member} initialMember={member} onClose={()=>setMember(null)} onMessage={()=>{}} openReport={openReport} blockMember={blockMember}/>
       <ReportSheet visible={!!reportTarget} target={reportTarget} onClose={()=>setReportTarget(null)} say={say} onReportSubmitted={onReportSubmitted}/>
     </KeyboardAvoidingView>
   );
