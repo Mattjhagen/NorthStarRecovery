@@ -1,0 +1,389 @@
+/* Northstar Recovery Admin Portal Styles */
+
+.ns-admin-app {
+  min-height: 100vh;
+  background-color: #0d1527;
+  color: #F4F1E8;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.ns-admin-header {
+  height: 64px;
+  background: #111d35;
+  border-bottom: 1px solid #1f2f4e;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.ns-admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #F4F1E8;
+}
+
+.ns-admin-badge {
+  background: rgba(93, 224, 166, 0.15);
+  border: 1px solid #5DE0A6;
+  color: #5DE0A6;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.ns-admin-user-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ns-admin-email-tag {
+  color: #9DADC5;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Layout */
+.ns-admin-layout {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - 64px);
+}
+
+/* Sidebar */
+.ns-admin-sidebar {
+  width: 260px;
+  background: #0f1a30;
+  border-right: 1px solid #1f2f4e;
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ns-admin-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #9DADC5;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.ns-admin-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #F4F1E8;
+}
+
+.ns-admin-tab-btn.active {
+  background: rgba(93, 224, 166, 0.12);
+  color: #5DE0A6;
+  border: 1px solid rgba(93, 224, 166, 0.3);
+}
+
+.ns-tab-badge {
+  margin-left: auto;
+  background: #EF4444;
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+/* Main Content */
+.ns-admin-main {
+  flex: 1;
+  padding: 32px;
+  max-width: 1200px;
+  overflow-y: auto;
+}
+
+.ns-admin-page-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #F4F1E8;
+  margin-bottom: 6px;
+}
+
+.ns-admin-page-sub {
+  color: #9DADC5;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+/* Grid & Cards */
+.ns-admin-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-bottom: 30px;
+}
+
+.ns-stat-card {
+  background: #14213d;
+  border: 1px solid #203358;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ns-stat-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #9DADC5;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ns-stat-val {
+  font-size: 32px;
+  font-weight: 900;
+  color: #F4F1E8;
+}
+
+.ns-stat-icon {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+.ns-card {
+  background: #14213d;
+  border: 1px solid #203358;
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.ns-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.ns-card-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #F4F1E8;
+}
+
+/* Tables */
+.ns-table-wrap {
+  overflow-x: auto;
+}
+
+.ns-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.ns-admin-table th {
+  background: #0f1a30;
+  color: #9DADC5;
+  padding: 12px 14px;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #203358;
+}
+
+.ns-admin-table td {
+  padding: 14px;
+  border-bottom: 1px solid #1a2a47;
+  color: #F4F1E8;
+  vertical-align: middle;
+}
+
+.ns-admin-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Badges */
+.ns-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ns-tag-active {
+  background: rgba(93, 224, 166, 0.15);
+  color: #5DE0A6;
+  border: 1px solid rgba(93, 224, 166, 0.3);
+}
+
+.ns-tag-banned {
+  background: rgba(239, 68, 68, 0.15);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.ns-tag-warn {
+  background: rgba(245, 185, 93, 0.15);
+  color: #F5B95D;
+  border: 1px solid rgba(245, 185, 93, 0.3);
+}
+
+/* Forms & Inputs */
+.ns-form-group {
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ns-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #9DADC5;
+}
+
+.ns-input, .ns-textarea, .ns-select {
+  background: #0c1628;
+  border: 1px solid #24385e;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #F4F1E8;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ns-input:focus, .ns-textarea:focus, .ns-select:focus {
+  border-color: #5DE0A6;
+}
+
+.ns-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* Buttons */
+.ns-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.ns-btn-primary {
+  background: #5DE0A6;
+  color: #101827;
+}
+
+.ns-btn-primary:hover {
+  background: #4cc791;
+}
+
+.ns-btn-secondary {
+  background: #1f2f4e;
+  color: #F4F1E8;
+  border: 1px solid #2f456e;
+}
+
+.ns-btn-secondary:hover {
+  background: #283c63;
+}
+
+.ns-btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.ns-btn-danger:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.ns-btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.ns-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Report Snippet */
+.ns-report-box {
+  background: #0c1628;
+  border-left: 3px solid #F5B95D;
+  padding: 14px;
+  border-radius: 8px;
+  margin: 10px 0;
+  font-style: italic;
+  color: #e2e8f0;
+}
+
+/* Email Preview */
+.ns-email-preview {
+  background: #ffffff;
+  color: #1a202c;
+  padding: 24px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  margin-top: 14px;
+}
+
+/* Login Modal / Screen */
+.ns-admin-auth-box {
+  max-width: 420px;
+  margin: 80px auto;
+  background: #14213d;
+  border: 1px solid #203358;
+  border-radius: 16px;
+  padding: 36px;
+}
+
+@media (max-width: 768px) {
+  .ns-admin-layout {
+    flex-direction: column;
+  }
+  .ns-admin-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #1f2f4e;
+  }
+  .ns-admin-main {
+    padding: 20px 16px;
+  }
+}

@@ -445,6 +445,42 @@ Resources:
       AuthorizerId: !Ref MemberApiAuthorizer
       Target: !Sub integrations/${MemberApiIntegration}
 
+  AdminNotifyRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: POST /v1/admin/notify
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  AdminUsersRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: GET /v1/admin/users
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  AdminStatsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: GET /v1/admin/stats
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
+  AdminEmailRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MemberApi
+      RouteKey: POST /v1/admin/email
+      AuthorizationType: JWT
+      AuthorizerId: !Ref MemberApiAuthorizer
+      Target: !Sub integrations/${MemberApiIntegration}
+
   DeviceRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:

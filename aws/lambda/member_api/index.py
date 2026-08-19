@@ -440,6 +440,108 @@ def handler(event, context):
                         send_expo_push(token, title, message)
                         sent_count += 1
             return reply(200, {'sent': sent_count})
+        if path == '/v1/admin/users' and method == 'GET':
+            user_list = []
+            paginator = profiles.meta.client.get_paginator('scan')
+            for page in paginator.paginate(TableName=profiles.name):
+                for item in page.get('Items', []):
+                    user_list.append({
+                        'memberId': item.get('memberId'),
+                        'pseudonym': item.get('pseudonym') or 'Anonymous',
+                        'bio': item.get('bio', ''),
+                        'gender': item.get('gender', ''),
+                        'sobrietyDate': item.get('sobrietyDate', ''),
+                        'groupPreference': item.get('groupPreference', ''),
+                        'xp': int(item.get('xp') or 0),
+                        'banned': bool(item.get('banned')),
+                        'deviceCount': len(item.get('deviceIds') or []),
+                        'hasPushToken': bool(item.get('expoPushToken')),
+                        'sponsorAvailable': bool(item.get('sponsorAvailable')),
+                        'createdAt': item.get('createdAt', '')
+                    })
+            return reply(200, {'users': user_list, 'total': len(user_list)})
+        if path == '/v1/admin/stats' and method == 'GET':
+            total_users = 0
+            banned_users = 0
+            push_tokens = 0
+            sponsors_count = 0
+            paginator = profiles.meta.client.get_paginator('scan')
+            for page in paginator.paginate(TableName=profiles.name):
+                for item in page.get('Items', []):
+                    total_users += 1
+                    if item.get('banned'):
+                        banned_users += 1
+                    if item.get('expoPushToken'):
+                        push_tokens += 1
+                    if item.get('sponsorAvailable'):
+                        sponsors_count += 1
+            reports_count = community.query(
+                KeyConditionExpression=Key('pk').eq('REPORT'),
+                Select='COUNT').get('Count', 0)
+            return reply(200, {
+                'totalUsers': total_users,
+                'bannedUsers': banned_users,
+                'activePushDevices': push_tokens,
+                'availableSponsors': sponsors_count,
+                'pendingReports': reports_count
+            })
+        if path == '/v1/admin/email' and method == 'POST':
+            api_key = str((body or {}).get('apiKey') or os.environ.get('RESEND_API_KEY', '')).strip()
+            subject = str((body or {}).get('subject') or '').strip()
+            from_email = str((body or {}).get('from') or 'Northstar Recovery <notifications@cmameet.site>').strip()
+            html_content = str((body or {}).get('html') or (body or {}).get('body') or '').strip()
+            text_content = str((body or {}).get('text') or (body or {}).get('body') or '').strip()
+            to_recipients = (body or {}).get('to')
+            if not api_key:
+                return reply(400, {'error': 'missing_resend_api_key', 'message': 'Resend API key is required.'})
+            if not subject or not (html_content or text_content):
+                return reply(400, {'error': 'invalid_payload', 'message': 'Subject and email body are required.'})
+            recipients = []
+            if isinstance(to_recipients, list) and to_recipients:
+                recipients = [str(r).strip() for r in to_recipients if str(r).strip()]
+            elif isinstance(to_recipients, str) and to_recipients.strip() and to_recipients.strip() != 'all':
+                recipients = [to_recipients.strip()]
+            else:
+                user_pool_id = os.environ.get('USER_POOL_ID')
+                if user_pool_id:
+                    try:
+                        cog_paginator = cognito.get_paginator('list_users')
+                        for page in cog_paginator.paginate(UserPoolId=user_pool_id):
+                            for u in page.get('Users', []):
+                                for attr in u.get('Attributes', []):
+                                    if attr.get('Name') == 'email' and attr.get('Value'):
+                                        recipients.append(attr.get('Value'))
+                    except Exception:
+                        pass
+            if not recipients:
+                return reply(400, {'error': 'no_recipients', 'message': 'No recipient emails found.'})
+            sent_count = 0
+            failed_count = 0
+            resend_url = 'https://api.resend.com/emails'
+            for r_email in set(recipients):
+                try:
+                    email_payload = json.dumps({
+                        'from': from_email,
+                        'to': [r_email],
+                        'subject': subject,
+                        'html': html_content,
+                        'text': text_content
+                    }).encode()
+                    req = urllib.request.Request(
+                        resend_url, data=email_payload,
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        }
+                    )
+                    with urllib.request.urlopen(req, timeout=5) as response:
+                        if 200 <= response.status < 300:
+                            sent_count += 1
+                        else:
+                            failed_count += 1
+                except Exception:
+                    failed_count += 1
+            return reply(200, {'sent': sent_count, 'failed': failed_count, 'total': len(set(recipients))})
         return reply(404, {'error': 'not_found'})
 
     if path == '/v1/sponsors' and method == 'GET':
