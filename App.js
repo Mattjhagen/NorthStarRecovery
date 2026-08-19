@@ -521,7 +521,24 @@ function AppInner() {
   };
 
   const [sessionReports, setSessionReports] = useState([]);
-  const addSessionReport = useCallback((r) => setSessionReports(prev => [r, ...prev]), []);
+  useEffect(() => {
+    AsyncStorage.getItem('northstar_moderation_reports').then(data => {
+      if (data) {
+        try {
+          const parsed = JSON.parse(data);
+          if (Array.isArray(parsed)) setSessionReports(parsed);
+        } catch {}
+      }
+    }).catch(() => {});
+  }, []);
+
+  const addSessionReport = useCallback((r) => {
+    setSessionReports(prev => {
+      const updated = [r, ...prev.filter(p => p.id !== r.id && p.targetId !== r.targetId)];
+      AsyncStorage.setItem('northstar_moderation_reports', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+  }, []);
 
   if (authState === 'loading') return <SplashScreen/>;
   if (authState === 'onboarding') return <Onboarding onComplete={p=>{setProfile(p);setAuthState('authenticated');}}/>;
@@ -1520,13 +1537,8 @@ function ReportSheet({ visible, target, onClose, say, onReportSubmitted }) {
     const targetId = String(target.targetId || 'target-' + Date.now());
     const contentSnippet = (shareContent && target.content) ? String(target.content).slice(0, 500) : '';
 
-    const payload = {
-      targetType,
-      targetId,
-      reason,
-    };
-    if (details.trim()) payload.details = details.trim();
-    if (contentSnippet) payload.contentSnippet = contentSnippet;
+    const repAuthor = target.author || (targetType === 'member' ? (target.pseudonym || target.author || 'Reported Member') : 'Community Member');
+    const repAuthorId = target.authorId || targetId;
 
     const localReportItem = {
       id: 'rep-' + Date.now(),
@@ -1536,11 +1548,21 @@ function ReportSheet({ visible, target, onClose, say, onReportSubmitted }) {
       details: details.trim(),
       snippet: contentSnippet || (target.author ? `Profile of ${target.author}` : 'Reported content'),
       contentSnippet: contentSnippet,
-      author: target.author || (targetType === 'member' ? (target.pseudonym || target.author || 'Reported Member') : 'Community Member'),
-      authorId: target.authorId || targetId,
+      author: repAuthor,
+      authorId: repAuthorId,
       reporterName: 'You',
       createdAt: new Date().toISOString()
     };
+
+    const payload = {
+      targetType,
+      targetId,
+      reason,
+      author: repAuthor,
+      authorId: repAuthorId,
+    };
+    if (details.trim()) payload.details = details.trim();
+    if (contentSnippet) payload.contentSnippet = contentSnippet;
 
     if (onReportSubmitted) {
       onReportSubmitted(localReportItem);
@@ -2301,13 +2323,23 @@ function AdminReports({ visible, onClose, say, localReports = [] }) {
   const [reports, setReports] = useState([]);
   const [busy, setBusy] = useState(false);
   const load = async () => {
+    let savedLocal = [];
+    try {
+      const raw = await AsyncStorage.getItem('northstar_moderation_reports');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) savedLocal = parsed;
+      }
+    } catch {}
+    const combinedLocal = [...localReports, ...savedLocal.filter(s => !localReports.some(l => l.targetId === s.targetId || l.id === s.id))];
+
     try {
       const d = await apiRequest('/v1/admin/reports');
-      const fetched = d.reports || [];
-      const merged = [...localReports, ...fetched.filter(f => !localReports.some(l => l.targetId === f.targetId || l.id === f.id))];
-      setReports(merged.length > 0 ? merged : localReports);
+      const fetched = d?.reports || [];
+      const merged = [...combinedLocal, ...fetched.filter(f => !combinedLocal.some(l => l.targetId === f.targetId || l.id === f.id))];
+      setReports(merged.length > 0 ? merged : combinedLocal);
     } catch {
-      setReports(localReports);
+      setReports(combinedLocal);
     }
   };
   useEffect(() => { if (visible) load(); }, [visible, localReports]);
@@ -2317,16 +2349,28 @@ function AdminReports({ visible, onClose, say, localReports = [] }) {
     catch { 
       // If offline or demo mode, apply locally
       if (path === '/v1/admin/remove-post') {
-        setReports(prev => prev.filter(r => r.targetId !== payload.postId));
+        setReports(prev => {
+          const updated = prev.filter(r => r.targetId !== payload.postId);
+          AsyncStorage.setItem('northstar_moderation_reports', JSON.stringify(updated)).catch(() => {});
+          return updated;
+        });
       } else if (path === '/v1/admin/ban') {
-        setReports(prev => prev.map(r => r.authorId === payload.memberId ? { ...r, banned: payload.banned } : r));
+        setReports(prev => {
+          const updated = prev.map(r => r.authorId === payload.memberId ? { ...r, banned: payload.banned } : r);
+          AsyncStorage.setItem('northstar_moderation_reports', JSON.stringify(updated)).catch(() => {});
+          return updated;
+        });
       }
       say(label); 
     }
     setBusy(false);
   };
   const dismiss = id => {
-    setReports(prev => prev.filter(r => r.id !== id));
+    setReports(prev => {
+      const updated = prev.filter(r => r.id !== id);
+      AsyncStorage.setItem('northstar_moderation_reports', JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
     say('Report dismissed.');
   };
   return (

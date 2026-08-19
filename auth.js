@@ -25,7 +25,7 @@ function ensureConfigured() {
 
 async function persistAccessToken() {
   const { tokens } = await fetchAuthSession();
-  const token = tokens?.accessToken?.toString();
+  const token = tokens?.idToken?.toString() || tokens?.accessToken?.toString();
   if (!token) throw new Error('Your secure session could not be created. Please sign in again.');
   await saveAccessToken(token);
 }

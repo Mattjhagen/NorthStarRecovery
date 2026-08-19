@@ -39,8 +39,15 @@ export default function AdminPortal() {
     checkinRate: 0
   });
 
-  // Reports (0 Defaults - Populated strictly from live DynamoDB)
-  const [reports, setReports] = useState([]);
+  // Reports (Populated from live DynamoDB & local moderation storage)
+  const [reports, setReports] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ns_moderation_reports');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // Users Directory (0 Defaults - Populated strictly from live DynamoDB)
   const [users, setUsers] = useState([]);
@@ -124,13 +131,23 @@ export default function AdminPortal() {
 
       // 3. Fetch live reports from DynamoDB
       const reportsRes = await fetch(`${API_BASE_URL}/v1/admin/reports`, { headers }).catch(() => null);
+      let liveReports = [];
       if (reportsRes && reportsRes.ok) {
         const liveReportsData = await reportsRes.json();
         if (Array.isArray(liveReportsData.reports)) {
-          setReports(liveReportsData.reports);
+          liveReports = liveReportsData.reports;
           setIsLiveAws(true);
         }
       }
+      const localStoredReports = (() => {
+        try {
+          const s = localStorage.getItem('ns_moderation_reports');
+          return s ? JSON.parse(s) : [];
+        } catch { return []; }
+      })();
+      const mergedReports = [...liveReports, ...localStoredReports.filter(l => !liveReports.some(r => r.id === l.id || r.targetId === l.targetId))];
+      setReports(mergedReports);
+      try { localStorage.setItem('ns_moderation_reports', JSON.stringify(mergedReports)); } catch {}
 
       // Dynamic metrics computation from real user data
       const iosCount = liveUserList.filter(u => u.deviceType === 'iOS' || (u.deviceModel && u.deviceModel.toLowerCase().includes('iphone'))).length;
@@ -296,13 +313,21 @@ export default function AdminPortal() {
 
   // Actions
   const handleRemovePost = (postId) => {
-    setReports(prev => prev.filter(r => r.targetId !== postId));
+    setReports(prev => {
+      const updated = prev.filter(r => r.targetId !== postId);
+      try { localStorage.setItem('ns_moderation_reports', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     showToast(`Post ${postId} removed.`);
   };
 
   const handleSuspendUser = (memberId, banDevice = false) => {
     setUsers(prev => prev.map(u => u.memberId === memberId ? { ...u, banned: true } : u));
-    setReports(prev => prev.filter(r => r.authorId !== memberId));
+    setReports(prev => {
+      const updated = prev.filter(r => r.authorId !== memberId);
+      try { localStorage.setItem('ns_moderation_reports', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     if (selectedUser && selectedUser.memberId === memberId) {
       setSelectedUser(prev => ({ ...prev, banned: true }));
     }
@@ -318,7 +343,11 @@ export default function AdminPortal() {
   };
 
   const handleDismissReport = (reportId) => {
-    setReports(prev => prev.filter(r => r.id !== reportId));
+    setReports(prev => {
+      const updated = prev.filter(r => r.id !== reportId);
+      try { localStorage.setItem('ns_moderation_reports', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     showToast('Report dismissed.');
   };
 
