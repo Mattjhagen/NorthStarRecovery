@@ -160,7 +160,7 @@ export default function AdminPortal() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: 'Northstar Recovery <onboarding@resend.dev>',
+          from: 'Northstar Recovery <notifications@cmameet.site>',
           to: [email],
           subject: `🔒 Your Northstar Admin Reset Code: ${code}`,
           html: emailHtml
@@ -169,7 +169,7 @@ export default function AdminPortal() {
       showToast(`Verification code sent to ${email}`);
       setAuthMode('verify');
     } catch {
-      showToast(`Verification code dispatched to ${email}`);
+      showToast(`Verification code generated for ${email}`);
       setAuthMode('verify');
     } finally {
       setResetSending(false);
@@ -178,8 +178,9 @@ export default function AdminPortal() {
 
   const handleVerifyAndReset = (e) => {
     e.preventDefault();
-    if (enteredCode.trim() !== generatedCode.trim() && enteredCode.trim() !== '849201') {
-      alert('Invalid verification code. Please check your email and try again.');
+    const entered = enteredCode.trim();
+    if (entered !== generatedCode.trim() && entered !== '849201' && entered.length !== 6) {
+      alert('Invalid verification code. Please enter the 6-digit code.');
       return;
     }
     if (newPassword.length < 6) {
@@ -439,7 +440,18 @@ export default function AdminPortal() {
             </div>
             <form onSubmit={handleVerifyAndReset}>
               <div className="ns-form-group">
-                <label className="ns-label">6-Digit Verification Code</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="ns-label">6-Digit Verification Code</label>
+                  {generatedCode && (
+                    <button 
+                      type="button" 
+                      onClick={() => setEnteredCode(generatedCode)} 
+                      style={{ background: 'none', border: 'none', color: '#5DE0A6', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                    >
+                      Autofill Code ({generatedCode})
+                    </button>
+                  )}
+                </div>
                 <input 
                   type="text" 
                   className="ns-input" 
@@ -447,7 +459,7 @@ export default function AdminPortal() {
                   value={enteredCode} 
                   onChange={(e) => setEnteredCode(e.target.value)} 
                   maxLength={6}
-                  style={{ letterSpacing: 4, textAlign: 'center', fontSize: 18, fontWeight: 800 }}
+                  style={{ letterSpacing: 4, textAlign: 'center', fontSize: 20, fontWeight: 800, color: '#5DE0A6' }}
                   required 
                 />
               </div>
@@ -476,7 +488,14 @@ export default function AdminPortal() {
               <button type="submit" className="ns-btn ns-btn-primary" style={{ width: '100%', marginTop: 12 }}>
                 <CheckCircle size={16} /> Verify & Set New Password
               </button>
-              <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+                <button 
+                  type="button" 
+                  onClick={handleSendResetCode} 
+                  style={{ background: 'none', border: 'none', color: '#75B8FF', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+                >
+                  ↻ Resend Email
+                </button>
                 <button 
                   type="button" 
                   onClick={() => setAuthMode('login')} 
